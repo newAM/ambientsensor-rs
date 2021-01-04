@@ -1,6 +1,6 @@
 # ambientsensor-rs
 
-This is a rust re-implementation of an embedded C project I did a while ago: [AmbientSenor].
+This is a rust re-implementation of an embedded C project I did a while ago: [AmbientSensor].
 
 Schematics, photos, ect. will be in that repository, this repository is just for the rust firmware.
 

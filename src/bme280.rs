@@ -235,14 +235,17 @@ where
         let mut buf: [u8; NUM_MEAS_REG] = [0; NUM_MEAS_REG];
         self.read_register(reg::PRESS_MSB, &mut buf)?;
 
-        let p: u32 = ((buf[0] as u32) << 12) | // msb [7:0] = p[19:12]
-                     ((buf[1] as u32) <<  4) | // lsb [7:0] = p[11:4]
-                     ((buf[2] as u32) >>  4); //  xlsb[7:4] = p[3:0]
-        let t: u32 = ((buf[3] as u32) << 12) | // msb [7:0] = t[19:12]
-                     ((buf[4] as u32) <<  4) | // lsb [7:0] = t[11:4]
-                     ((buf[5] as u32) >>  4); //  xlsb[7:4] = t[3:0]
-        let h: u32 = ((buf[6] as u32) <<  8) | // msb [7:0] = h[15:8]
-                     ((buf[7] as u32)      ); //  lsb [7:0] = h[7:0]
+        // msb [7:0] = p[19:12]
+        // lsb [7:0] = p[11:4]
+        // xlsb[7:4] = p[3:0]
+        let p: u32 = ((buf[0] as u32) << 12) | ((buf[1] as u32) << 4) | ((buf[2] as u32) >> 4);
+        // msb [7:0] = t[19:12]
+        // lsb [7:0] = t[11:4]
+        // xlsb[7:4] = t[3:0]
+        let t: u32 = ((buf[3] as u32) << 12) | ((buf[4] as u32) << 4) | ((buf[5] as u32) >> 4);
+        // msb [7:0] = h[15:8]
+        // lsb [7:0] = h[7:0]
+        let h: u32 = ((buf[6] as u32) << 8) | (buf[7] as u32);
 
         // output is held in reset
         debug_assert_ne!(t, 0x80000000);
@@ -270,7 +273,7 @@ where
         let var2: i64 = var2 + ((var1 * (cal.p5 as i64)) << 17);
         let var2: i64 = var2 + ((cal.p4 as i64) << 35);
         let var1: i64 = ((var1 * var1 * (cal.p3 as i64)) >> 8) + ((var1 * (cal.p4 as i64)) << 12);
-        let var1: i64 = (((1i64) << 47) + var1) * (cal.p1 as i64) >> 33;
+        let var1: i64 = ((((1i64) << 47) + var1) * (cal.p1 as i64)) >> 33;
         let pressure: f32 = if var1 == 0 {
             0.0
         } else {
@@ -286,7 +289,7 @@ where
         let var1: i32 = t_fine - 76800i32;
         let var1: i32 =
             ((((h << 14) - ((cal.h4 as i32) << 20) - ((cal.h5 as i32) * var1)) + 16384i32) >> 15)
-                * ((((((var1 * (cal.h6 as i32) >> 10)
+                * (((((((var1 * (cal.h6 as i32)) >> 10)
                     * (((var1 * (cal.h3 as i32)) >> 11) + (32768i32)))
                     >> 10)
                     + (2097152i32))

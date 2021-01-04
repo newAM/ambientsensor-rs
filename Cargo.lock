@@ -331,6 +331,7 @@ dependencies = [
 [[package]]
 name = "stm32f0xx-hal"
 version = "0.17.1"
+source = "git+https://github.com/stm32-rs/stm32f0xx-hal.git?rev=fba9834b59fa7567ffd604afed2bcd8d07c4e904#fba9834b59fa7567ffd604afed2bcd8d07c4e904"
 dependencies = [
  "bare-metal 1.0.0",
  "cast",
