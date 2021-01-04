@@ -1,0 +1,15 @@
+[default.general]
+chip = "stm32f070cbtx"
+# log_level = "TRACE"
+
+[default.probe]
+# The speed in kHz of the data link to the target.
+speed = 1800
+
+[default.rtt]
+enabled = true
+log_enabled = false
+
+[default.gdb]
+enable = true
+gdb_connection_string = "127.0.0.1:3333"

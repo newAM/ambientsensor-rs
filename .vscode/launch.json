@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Remote debug",
+            "type": "gdb",
+            "request": "launch",
+            "cwd": "${workspaceRoot}",
+            "target": "${workspaceRoot}/target/thumbv6m-none-eabi/debug/ambientsensor",
+            "gdbpath": "gdb-multiarch",
+            "autorun": ["source -v .gdbinit"]
+        }
+    ]
+}
