@@ -35,9 +35,17 @@ There is not a lot of commentary I can offer about embedded rust that has not al
 * [eeprom25aa02e48](https://github.com/newAM/eeprom25aa02e48-rs) - EEPROM driver, my first rust code
 * [w5500-ll](https://github.com/newAM/w5500-ll-rs) - W5500 Ethernet chip driver
 
-## Other Mentions
+## Building
+You will need [rustup] and the `thumbv6m-none-eabi` target.
 
-The [ferrous systems blog] is a great read, and they keep me excited about the future of embedded development.
+```bash
+rustup target add thumbv6m-none-eabi
+```
 
-[ferrous systems blog]: https://ferrous-systems.com/blog/
+After you have that target available simply build, the default target is already set in `.cargo/config.toml`.
+```bash
+cargo build
+```
+
+[rustup]: https://rustup.rs/
 [AmbientSensor]: https://github.com/newam/ambientsensor

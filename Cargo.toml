@@ -14,7 +14,7 @@ eeprom25aa02e48 = "~0.1.0"
 
 [dependencies.w5500-ll]
 # path = "/home/alex/git/w5500-ll-rs"
-version = "~0.2.0"
+version = "0.3"
 
 [dependencies.stm32f0xx-hal]
 # https://github.com/stm32-rs/stm32f0xx-hal
