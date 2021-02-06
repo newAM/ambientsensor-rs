@@ -33,8 +33,9 @@ impl From<CtrlPacket> for u8 {
 }
 
 /// Connection return codes.
+#[repr(u8)]
 #[allow(non_camel_case_types, dead_code)]
-enum ConnectCode {
+pub enum ConnectCode {
     /// Connection Accepted
     ACCEPT = 0,
     /// Connection Refused, unacceptable protocol version
@@ -47,6 +48,12 @@ enum ConnectCode {
     BAD_CREDS = 4,
     /// Connection Refused, not authorized
     NOT_AUTH = 5,
+}
+
+impl From<ConnectCode> for u8 {
+    fn from(val: ConnectCode) -> Self {
+        val as u8
+    }
 }
 
 const CONNECT_BUF_LEN: usize = 14;
@@ -88,11 +95,11 @@ impl Connack {
         Connack { buf: [0; 4] }
     }
 
-    pub const fn msg_type(&self) -> u8 {
+    pub const fn ctrl_pkt_type(&self) -> u8 {
         self.buf[0] >> 4
     }
 
-    pub const fn msg_len(&self) -> u8 {
+    pub const fn remaining_len(&self) -> u8 {
         self.buf[1]
     }
 

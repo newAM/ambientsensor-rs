@@ -9,7 +9,7 @@ mod mqtt;
 use bme280::BME280;
 use dhcp::{DhcpBuf, DhcpState, MsgType, DHCP_DESTINATION, DHCP_SOURCE_PORT};
 use monotonic::{Instant, Tim6Monotonic, U16Ext};
-use mqtt::{Connack, CtrlPacket, Publish, CONNACK_LEN};
+use mqtt::{Connack, ConnectCode, CtrlPacket, Publish, CONNACK_LEN};
 
 use core::fmt::Write;
 use core::sync::atomic::compiler_fence;
@@ -209,6 +209,7 @@ const APP: () = {
         loop {
             eeprom.read_eui48(&mut mac.octets).unwrap();
             if mac == Eui48Addr::UNSPECIFIED || mac == BAD_MAC {
+                rprintln!("Failed to read the MAC address: {}", mac);
                 nop_delay_ms(10);
             } else {
                 break;
@@ -217,10 +218,6 @@ const APP: () = {
         debug_assert_eq!(mac.octets[0], 0x54);
         rprintln!("MAC: {}", mac);
 
-        // sanity check temperature sensor
-        assert_eq!(bme280.chip_id().unwrap(), bme280::CHIP_ID);
-        bme280.init().unwrap();
-
         // reset the W5500
         w5500_rst.set_high().unwrap();
         nop_delay_ms(1);
@@ -228,6 +225,10 @@ const APP: () = {
         nop_delay_ms(1);
         w5500_rst.set_high().unwrap();
         nop_delay_ms(3);
+
+        // sanity check temperature sensor
+        assert_eq!(bme280.chip_id().unwrap(), bme280::CHIP_ID);
+        bme280.init().unwrap();
 
         // enable external interrupt for pb0 (W5500 interrupt)
         syscfg.exticr1.modify(|_, w| w.exti0().pb0());
@@ -240,36 +241,54 @@ const APP: () = {
         exti.rtsr.modify(|_, w| w.tr0().clear_bit());
         exti.ftsr.modify(|_, w| w.tr0().set_bit());
 
-        // sanity check W5500 communications
-        assert_eq!(w5500.version().unwrap(), w5500_hl::ll::VERSION);
+        // continually initialize the W5500 until we link up
+        // since we are using power over Ethernet we know that if the device
+        // has power it also has an Ethernet cable connected.
+        let phy_cfg: PhyCfg = 'outer: loop {
+            // sanity check W5500 communications
+            assert_eq!(w5500.version().unwrap(), w5500_hl::ll::VERSION);
 
-        // load the MAC address we got from EEPROM
-        w5500.set_shar(&mac).unwrap();
+            // load the MAC address we got from EEPROM
+            w5500.set_shar(&mac).unwrap();
+            debug_assert_eq!(w5500.shar().unwrap(), mac);
 
-        // wait for the PHY to indicate the Ethernet link is up
-        let mut attempts: usize = 0;
-        rprintln!("Polling for link up");
-        let mut phy_cfg: PhyCfg = PhyCfg::default();
-        phy_cfg.set_opmdc(OperationMode::FullDuplex10bt);
-        w5500.set_phycfgr(phy_cfg).unwrap();
-        let mut phy_cfg: PhyCfg = w5500.phycfgr().unwrap();
-        while phy_cfg.lnk() != LinkStatus::Up {
-            attempts += 1;
-            assert!(attempts < 50);
-            nop_delay_ms(100);
-            phy_cfg = w5500.phycfgr().unwrap();
-        }
-        rprintln!("Done link up in about {} ms\n", attempts * 100);
-        rprintln!("{}", phy_cfg);
+            // wait for the PHY to indicate the Ethernet link is up
+            let mut attempts: usize = 0;
+            rprintln!("Polling for link up");
+            let mut phy_cfg: PhyCfg = PhyCfg::default();
+            phy_cfg.set_opmdc(OperationMode::FullDuplex10bt);
+            w5500.set_phycfgr(phy_cfg).unwrap();
+
+            const LINK_UP_POLL_PERIOD_MILLIS: usize = 100;
+            const LINK_UP_POLL_ATTEMPTS: usize = 50;
+            loop {
+                let phy_cfg: PhyCfg = w5500.phycfgr().unwrap();
+                if phy_cfg.lnk() == LinkStatus::Up {
+                    break 'outer phy_cfg;
+                }
+                if attempts >= LINK_UP_POLL_ATTEMPTS {
+                    rprintln!(
+                        "Failed to link up in {} ms",
+                        attempts * LINK_UP_POLL_PERIOD_MILLIS,
+                    );
+                    break;
+                }
+                nop_delay_ms(100);
+                attempts += 1;
+            }
+
+            w5500_rst.set_low().unwrap();
+            nop_delay_ms(1);
+            w5500_rst.set_high().unwrap();
+            nop_delay_ms(3);
+        };
+        rprintln!("Done link up\n{}", phy_cfg);
 
         // enable all the socket interrupts
         w5500.set_simr(0xFF).unwrap();
 
         // start the DHCP task
         cx.spawn.dhcp_fsm().unwrap();
-        // cx.schedule
-        //     .mqtt_client(cx.start + 3000u16.millis())
-        //     .unwrap();
 
         #[allow(clippy::redundant_field_names)]
         init::LateResources {
@@ -539,21 +558,34 @@ const APP: () = {
             MqttState::RecvInt => {
                 rprintln!("[MQTT] recv");
                 let mut connack: Connack = Connack::new();
-                let rx_bytes = w5500.tcp_read(MQTT_SOCKET, &mut connack.buf).unwrap();
+                let rx_bytes: usize = w5500.tcp_read(MQTT_SOCKET, &mut connack.buf).unwrap();
                 // the server should only ever send us the CONNACK packet
-                assert_eq!(rx_bytes, CONNACK_LEN);
-                assert_eq!(connack.msg_type(), CtrlPacket::CONNACK.into());
-                assert_eq!(connack.msg_len(), 2);
-
-                match connack.rc() {
-                    0 => {
-                        rprintln!("[MQTT] CONNACK");
-                        *mqtt_state = MqttState::Happy
-                    }
-                    x => {
-                        rprintln!("[MQTT] BAD CONNACK: {}", x);
-                        *mqtt_state = MqttState::Init;
-                    }
+                if rx_bytes != CONNACK_LEN {
+                    rprintln!(
+                        "[MQTT] CONNACK buffer underrrun {}/{}",
+                        rx_bytes,
+                        CONNACK_LEN
+                    );
+                    *mqtt_state = MqttState::Init;
+                } else if connack.ctrl_pkt_type() != CtrlPacket::CONNACK.into() {
+                    rprintln!(
+                        "[MQTT] Excepted a CONNACK byte (0x{:02X}), found byte 0x{:02X}",
+                        u8::from(CtrlPacket::CONNACK),
+                        connack.ctrl_pkt_type()
+                    );
+                    *mqtt_state = MqttState::Init;
+                } else if connack.remaining_len() != 2 {
+                    rprintln!(
+                        "[MQTT] CONNACK remaining length is unexpected: {} (expected 2)",
+                        connack.remaining_len()
+                    );
+                    *mqtt_state = MqttState::Init;
+                } else if connack.rc() == ConnectCode::ACCEPT.into() {
+                    rprintln!("[MQTT] CONNACK");
+                    *mqtt_state = MqttState::Happy;
+                } else {
+                    rprintln!("[MQTT] Unexpected CONNACK code: 0x{:02X}", connack.rc());
+                    *mqtt_state = MqttState::Init;
                 }
 
                 cx.schedule
