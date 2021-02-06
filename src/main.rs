@@ -5,14 +5,11 @@ mod bme280;
 mod dhcp;
 mod monotonic;
 mod mqtt;
-mod w5500;
 
 use bme280::BME280;
-use dhcp::{DhcpBuf, DhcpState, MsgType, DHCP_DESTINATION_PORT, DHCP_SOURCE_PORT};
+use dhcp::{DhcpBuf, DhcpState, MsgType, DHCP_DESTINATION, DHCP_SOURCE_PORT};
 use monotonic::{Instant, Tim6Monotonic, U16Ext};
 use mqtt::{Connack, CtrlPacket, Publish, CONNACK_LEN};
-use net::Eui48Addr;
-use w5500::{SocketAddrV4, W5500};
 
 use core::fmt::Write;
 use core::sync::atomic::compiler_fence;
@@ -32,16 +29,20 @@ use stm32f0xx_hal::{
     prelude::*,
     spi::{self, Spi},
 };
-use w5500_ll::{self, OperationMode, SocketInterruptMask};
-use w5500_ll::{
-    net, LinkStatus, Protocol, Registers, Socket, SocketCommand, SocketInterrupt, SocketMode,
-    SocketStatus,
+
+use w5500_hl::ll::{
+    blocking::vdm::W5500,
+    net::{Eui48Addr, Ipv4Addr, SocketAddrV4},
+    spi::MODE as W5500_MODE,
+    LinkStatus, OperationMode, PhyCfg, Registers, Socket, SocketInterrupt, SocketInterruptMask,
+    SOCKETS,
 };
-use w5500_ll::{net::Ipv4Addr, PhyCfg};
+use w5500_hl::{Tcp, Udp};
 
 const DHCP_SOCKET: Socket = Socket::Socket0;
 const MQTT_SOCKET: Socket = Socket::Socket1;
 
+const MQTT_SERVER: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(10, 0, 0, 4), 1883);
 const HOSTNAME: &str = "ambient1";
 const TEMPERATURE_TOPIC: &str = "/home/ambient1/temperature";
 const HUMIDITY_TOPIC: &str = "/home/ambient1/humidity";
@@ -193,8 +194,8 @@ const APP: () = {
                     ),
                 )
             });
-        let spi1 = Spi::spi1(dp.SPI1, spi1_pins, w5500_ll::spi::MODE, 1.mhz(), &mut rcc);
-        let spi2 = Spi::spi2(dp.SPI2, spi2_pins, w5500_ll::spi::MODE, 1.mhz(), &mut rcc);
+        let spi1 = Spi::spi1(dp.SPI1, spi1_pins, W5500_MODE, 1.mhz(), &mut rcc);
+        let spi2 = Spi::spi2(dp.SPI2, spi2_pins, W5500_MODE, 1.mhz(), &mut rcc);
         let i2c = I2c::i2c1(dp.I2C1, i2c1_pins, 100.khz(), &mut rcc);
         let mut eeprom = eeprom25aa02e48::Eeprom25aa02e48::new(spi2, eepom_cs);
         let mut bme280 = BME280::new(i2c);
@@ -203,7 +204,7 @@ const APP: () = {
         // get the MAC address from the EEPROM
         // the Microchip 25aa02e48 EEPROM comes pre-programmed with a valid MAC
         // TODO: investigate why this fails
-        let mut mac: Eui48Addr = net::Eui48Addr::UNSPECIFIED;
+        let mut mac: Eui48Addr = Eui48Addr::UNSPECIFIED;
         const BAD_MAC: Eui48Addr = Eui48Addr::new(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
         loop {
             eeprom.read_eui48(&mut mac.octets).unwrap();
@@ -240,7 +241,7 @@ const APP: () = {
         exti.ftsr.modify(|_, w| w.tr0().set_bit());
 
         // sanity check W5500 communications
-        assert_eq!(w5500.version().unwrap(), w5500_ll::VERSION);
+        assert_eq!(w5500.version().unwrap(), w5500_hl::ll::VERSION);
 
         // load the MAC address we got from EEPROM
         w5500.set_shar(&mac).unwrap();
@@ -307,7 +308,7 @@ const APP: () = {
         let mut sir: u8 = w5500.sir().unwrap();
         debug_assert_ne!(sir, 0x00);
 
-        for socket in w5500_ll::SOCKETS.iter() {
+        for socket in SOCKETS.iter() {
             let mask: u8 = 1 << (*socket as u8);
             if sir & mask != 0 {
                 let sn_ir: SocketInterrupt = w5500.sn_ir(*socket).unwrap();
@@ -396,8 +397,13 @@ const APP: () = {
         let mut dhcp_buf = unsafe { DhcpBuf::steal() };
 
         let mut dhcp_recv = || -> bool {
-            let (num_bytes, _) = w5500.recv_from_udp(DHCP_SOCKET, &mut dhcp_buf.buf).unwrap();
-            assert!(num_bytes < dhcp_buf.buf.len());
+            let (num_bytes, _) = w5500.udp_recv_from(DHCP_SOCKET, &mut dhcp_buf.buf).unwrap();
+            rprintln!("Read {} bytes", num_bytes);
+            assert!(
+                num_bytes < dhcp_buf.buf.len(),
+                "Buffer was too small to receive all data"
+            );
+            // TODO: handle buffer underrun
 
             if !dhcp_buf.is_bootreply() {
                 rprintln!("not a bootreply");
@@ -419,20 +425,16 @@ const APP: () = {
         match dhcp_state {
             DhcpState::INIT => {
                 rprintln!("DHCP INIT");
-                w5500.bind_udp(DHCP_SOCKET, DHCP_SOURCE_PORT).unwrap();
-                const DHCP_DESTINATION: SocketAddrV4 =
-                    SocketAddrV4::new(Ipv4Addr::BROADCAST, DHCP_DESTINATION_PORT);
-                w5500
-                    .set_destination(DHCP_SOCKET, DHCP_DESTINATION)
-                    .unwrap();
+                w5500.udp_bind(DHCP_SOCKET, DHCP_SOURCE_PORT).unwrap();
 
                 dhcp_buf.dhcp_discover(mac, HOSTNAME);
                 dhcp_buf.set_xid(*xid);
                 debug_assert_eq!(dhcp_buf.xid(), *xid);
                 rprintln!("[DHCP] SENDING DISCOVER");
-                w5500
-                    .socket_send(DHCP_SOCKET, &dhcp_buf.buf[..dhcp_buf.buf_ptr])
+                let tx_bytes = w5500
+                    .udp_send_to(DHCP_SOCKET, dhcp_buf.tx_data(), &DHCP_DESTINATION)
                     .unwrap();
+                assert_eq!(tx_bytes, dhcp_buf.tx_data_len());
 
                 *dhcp_state = DhcpState::SELECTING;
 
@@ -455,9 +457,8 @@ const APP: () = {
                 dhcp_buf.dhcp_request(mac, yiaddr, HOSTNAME);
                 dhcp_buf.set_xid(*xid);
                 rprintln!("[DHCP] SENDING REQUEST");
-                w5500
-                    .socket_send(DHCP_SOCKET, &dhcp_buf.buf[..dhcp_buf.buf_ptr])
-                    .unwrap();
+                let tx_bytes = w5500.udp_send(DHCP_SOCKET, dhcp_buf.tx_data()).unwrap();
+                assert_eq!(tx_bytes, dhcp_buf.tx_data_len());
 
                 *dhcp_state = DhcpState::REQUESTING;
 
@@ -521,45 +522,26 @@ const APP: () = {
         match mqtt_state {
             MqttState::Init => {
                 rprintln!("[MQTT] init");
-                w5500.socket_close(MQTT_SOCKET).unwrap();
                 let mut sn_imr = SocketInterruptMask::default();
                 sn_imr.mask_sendok();
                 w5500.set_sn_imr(MQTT_SOCKET, sn_imr).unwrap();
-                let mut mode: SocketMode = SocketMode::default();
-                mode.set_protocol(Protocol::Tcp);
-                w5500.set_sn_mr(MQTT_SOCKET, mode).unwrap();
-                w5500.set_sn_port(MQTT_SOCKET, 33650).unwrap();
-                w5500.set_sn_cr(MQTT_SOCKET, SocketCommand::Open).unwrap();
-                w5500.set_sn_dport(MQTT_SOCKET, 1883).unwrap();
-                w5500
-                    .set_sn_dipr(MQTT_SOCKET, &Ipv4Addr::new(10, 0, 0, 4))
-                    .unwrap();
-                w5500.poll_sn_sr(MQTT_SOCKET, SocketStatus::Init).unwrap();
-                w5500
-                    .set_sn_cr(MQTT_SOCKET, SocketCommand::Connect)
-                    .unwrap();
+                w5500.tcp_connect(MQTT_SOCKET, 33650, &MQTT_SERVER).unwrap();
 
                 // we will be spawned by socket interrupt
             }
             MqttState::ConInt => {
                 rprintln!("[MQTT] CONNECT");
-                w5500.socket_send(MQTT_SOCKET, &mqtt::CONNECT).unwrap();
+                let tx_bytes: usize = w5500.tcp_write(MQTT_SOCKET, &mqtt::CONNECT).unwrap();
+                assert_eq!(tx_bytes, mqtt::CONNECT.len());
 
                 // we will be spawned by socket interrupt
             }
             MqttState::RecvInt => {
                 rprintln!("[MQTT] recv");
                 let mut connack: Connack = Connack::new();
-                let rsr: u16 = w5500.sn_rx_rsr(MQTT_SOCKET).unwrap();
+                let rx_bytes = w5500.tcp_read(MQTT_SOCKET, &mut connack.buf).unwrap();
                 // the server should only ever send us the CONNACK packet
-                assert_eq!(usize::from(rsr), CONNACK_LEN);
-                let ptr: u16 = w5500.sn_rx_rd(MQTT_SOCKET).unwrap();
-                w5500.sn_rx_buf(MQTT_SOCKET, ptr, &mut connack.buf).unwrap();
-                w5500
-                    .set_sn_rx_rd(MQTT_SOCKET, ptr.wrapping_add(rsr))
-                    .unwrap();
-                w5500.set_sn_cr(MQTT_SOCKET, SocketCommand::Recv).unwrap();
-
+                assert_eq!(rx_bytes, CONNACK_LEN);
                 assert_eq!(connack.msg_type(), CtrlPacket::CONNACK.into());
                 assert_eq!(connack.msg_len(), 2);
 
@@ -589,7 +571,8 @@ const APP: () = {
                     publish
                         .write_fmt(format_args!("{:.1}", sample.temperature))
                         .unwrap();
-                    w5500.socket_send(MQTT_SOCKET, publish.as_slice()).unwrap();
+                    let tx_bytes: usize = w5500.tcp_write(MQTT_SOCKET, publish.as_slice()).unwrap();
+                    assert_eq!(tx_bytes, publish.as_slice().len());
                 }
                 {
                     let mut publish: Publish = Publish::new();
@@ -597,7 +580,8 @@ const APP: () = {
                     publish
                         .write_fmt(format_args!("{}", sample.pressure as i32))
                         .unwrap();
-                    w5500.socket_send(MQTT_SOCKET, publish.as_slice()).unwrap();
+                    let tx_bytes: usize = w5500.tcp_write(MQTT_SOCKET, publish.as_slice()).unwrap();
+                    assert_eq!(tx_bytes, publish.as_slice().len());
                 }
                 {
                     let mut publish: Publish = Publish::new();
@@ -605,7 +589,8 @@ const APP: () = {
                     publish
                         .write_fmt(format_args!("{:.1}", sample.humidity))
                         .unwrap();
-                    w5500.socket_send(MQTT_SOCKET, publish.as_slice()).unwrap();
+                    let tx_bytes: usize = w5500.tcp_write(MQTT_SOCKET, publish.as_slice()).unwrap();
+                    assert_eq!(tx_bytes, publish.as_slice().len());
                 }
 
                 cx.schedule

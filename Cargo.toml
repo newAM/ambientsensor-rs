@@ -5,20 +5,17 @@ authors = ["Alex M. <alexmgit@protonmail.com>"]
 edition = "2018"
 
 [dependencies]
-cortex-m = "~0.6.4"
+cortex-m = "~0.7.1"
 cortex-m-rt = "~0.6.13"
 embedded-hal = "~0.2.4"
 rtt-target = { version = "~0.3.0", features = ["cortex-m"] }
 cortex-m-rtic = "~0.5.5"
 eeprom25aa02e48 = "~0.1.0"
 
-[dependencies.w5500-ll]
-# path = "/home/alex/git/w5500-ll-rs"
-version = "0.3"
+[dependencies.w5500-hl]
+version = "0.1.0-alpha.2"
 
 [dependencies.stm32f0xx-hal]
-# https://github.com/stm32-rs/stm32f0xx-hal
-# path = "/home/alex/git/stm32f0xx-hal"
 git = "https://github.com/stm32-rs/stm32f0xx-hal.git"
 rev = "fba9834b59fa7567ffd604afed2bcd8d07c4e904"
 features = ["stm32f070xb", "rt"] 

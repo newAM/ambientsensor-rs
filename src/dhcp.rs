@@ -10,7 +10,7 @@
 //! This is pretty low-effort code here.
 //! Minimum viable product sort of thing.
 use core::convert::{TryFrom, TryInto};
-use w5500_ll::net::{Eui48Addr, Ipv4Addr};
+use w5500_hl::net::{Eui48Addr, Ipv4Addr, SocketAddrV4};
 
 /// DHCP state.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -86,6 +86,9 @@ impl From<DhcpOp> for u8 {
 
 pub const DHCP_DESTINATION_PORT: u16 = 67;
 pub const DHCP_SOURCE_PORT: u16 = 68;
+pub const DHCP_DESTINATION: SocketAddrV4 =
+    SocketAddrV4::new(Ipv4Addr::BROADCAST, DHCP_DESTINATION_PORT);
+
 const HTYPE10MB: u8 = 1;
 /// Server name size.
 const SNAME_SIZE: usize = 64;
@@ -98,7 +101,7 @@ static mut DHCP_BUF: [u8; BUF_SIZE] = [0; BUF_SIZE];
 
 pub struct DhcpBuf {
     pub buf: [u8; BUF_SIZE],
-    pub buf_ptr: usize,
+    buf_ptr: usize,
 }
 
 impl DhcpBuf {
@@ -352,5 +355,13 @@ impl DhcpBuf {
         self.option_parameter_request();
         self.option_requested_ip(ip);
         self.option_end();
+    }
+
+    pub fn tx_data(&self) -> &[u8] {
+        &self.buf[..self.buf_ptr]
+    }
+
+    pub fn tx_data_len(&self) -> usize {
+        self.buf_ptr
     }
 }

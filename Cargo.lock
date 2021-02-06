@@ -13,14 +13,14 @@ dependencies = [
 name = "ambientsensor"
 version = "0.1.0"
 dependencies = [
- "cortex-m",
+ "cortex-m 0.7.1",
  "cortex-m-rt",
  "cortex-m-rtic",
  "eeprom25aa02e48",
  "embedded-hal",
  "rtt-target",
  "stm32f0xx-hal",
- "w5500-ll",
+ "w5500-hl",
 ]
 
 [[package]]
@@ -79,13 +79,26 @@ dependencies = [
 
 [[package]]
 name = "cortex-m"
-version = "0.6.4"
+version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88cdafeafba636c00c467ded7f1587210725a1adfab0c24028a7844b87738263"
+checksum = "9075300b07c6a56263b9b582c214d0ff037b00d45ec9fde1cc711490c56f1bb9"
 dependencies = [
  "aligned",
  "bare-metal 0.2.5",
  "bitfield",
+ "cortex-m 0.7.1",
+ "volatile-register",
+]
+
+[[package]]
+name = "cortex-m"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0b756a8bffc56025de45218a48ff9b801180440c0ee49a722b32d49dcebc771"
+dependencies = [
+ "bare-metal 0.2.5",
+ "bitfield",
+ "embedded-hal",
  "volatile-register",
 ]
 
@@ -116,7 +129,7 @@ version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b30efcb6b7920d9016182c485687f0012487032a14c415d2fce6e9862ef8260e"
 dependencies = [
- "cortex-m",
+ "cortex-m 0.6.7",
  "cortex-m-rt",
  "cortex-m-rtic-macros",
  "heapless",
@@ -282,7 +295,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01a267556daa12832ffc20129af69a6db0a28af91bcf12b4468af21f48818f66"
 dependencies = [
- "cortex-m",
+ "cortex-m 0.6.7",
  "ufmt-write",
 ]
 
@@ -323,7 +336,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "401a6a390b26fff7c8166049cac102511d557fd5204f5d4795bfb00301b00730"
 dependencies = [
  "bare-metal 0.2.5",
- "cortex-m",
+ "cortex-m 0.6.7",
  "cortex-m-rt",
  "vcell",
 ]
@@ -335,7 +348,7 @@ source = "git+https://github.com/stm32-rs/stm32f0xx-hal.git?rev=fba9834b59fa7567
 dependencies = [
  "bare-metal 1.0.0",
  "cast",
- "cortex-m",
+ "cortex-m 0.6.7",
  "embedded-hal",
  "nb 1.0.0",
  "stm32f0",
@@ -344,9 +357,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.58"
+version = "1.0.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc60a3d73ea6594cd712d830cc1f0390fd71542d8c8cd24e70cc54cdfd5e05d5"
+checksum = "c700597eca8a5a762beb35753ef6b94df201c81cca676604f547495a0d7f0081"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -399,10 +412,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "w5500-ll"
-version = "0.3.0"
+name = "w5500-hl"
+version = "0.1.0-alpha.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "928f6ed64c557d037eaab751971b24a0399db478070f866977584b23c175f753"
+checksum = "44c2f8d1b463daf96fff43de18442def036aedd21f03b9f6d0280a484f1ccb0d"
+dependencies = [
+ "nb 1.0.0",
+ "w5500-ll",
+]
+
+[[package]]
+name = "w5500-ll"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "739d713aa7000705b1fab7f0d7cacb23fca33df0755e499eacb698abd7ba83ea"
 dependencies = [
  "embedded-hal",
 ]
