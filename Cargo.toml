@@ -13,7 +13,8 @@ cortex-m-rtic = "~0.5.5"
 eeprom25aa02e48 = "~0.1.0"
 
 [dependencies.w5500-hl]
-version = "0.1.0-alpha.2"
+version = "0.2.0"
+features = ["embedded-hal"]
 
 [dependencies.stm32f0xx-hal]
 git = "https://github.com/stm32-rs/stm32f0xx-hal.git"

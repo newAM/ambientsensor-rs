@@ -395,6 +395,8 @@ const APP: () = {
             rprintln!("[DHCP] timeout");
             *dhcp_state = DhcpState::INIT;
             cx.spawn.dhcp_fsm().unwrap();
+        } else {
+            rprintln!("[DHCP] no timeout occured")
         }
     }
 
