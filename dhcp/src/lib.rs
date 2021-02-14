@@ -18,42 +18,42 @@ pub enum DhcpState {
 }
 
 impl DhcpState {
-    /// Returns `true` if the DHCP state is [`Init`].
+    /// Returns `true` if the state is [`DhcpState::Init`].
     pub fn is_init(&self) -> bool {
         matches!(self, Self::Init)
     }
 
-    /// Returns `true` if the DHCP state is [`Selecting`].
+    /// Returns `true` if the state is [`DhcpState::Selecting`].
     pub fn is_selecting(&self) -> bool {
         matches!(self, Self::Selecting)
     }
 
-    /// Returns `true` if the DHCP state is [`Requesting`].
+    /// Returns `true` if the state is [`DhcpState::Requesting`].
     pub fn is_requesting(&self) -> bool {
         matches!(self, Self::Requesting)
     }
 
-    /// Returns `true` if the dhcp_state is [`InitReboot`].
+    /// Returns `true` if the state is [`DhcpState::InitReboot`].
     pub fn is_init_reboot(&self) -> bool {
         matches!(self, Self::InitReboot)
     }
 
-    /// Returns `true` if the DHCP state is [`Rebooting`].
+    /// Returns `true` if the state is [`DhcpState::Rebooting`].
     pub fn is_rebooting(&self) -> bool {
         matches!(self, Self::Rebooting)
     }
 
-    /// Returns `true` if the DHCP state is [`Bound`].
+    /// Returns `true` if the state is [`DhcpState::Bound`].
     pub fn is_bound(&self) -> bool {
         matches!(self, Self::Bound)
     }
 
-    /// Returns `true` if the DHCP state is [`Renewing`].
+    /// Returns `true` if the state is [`DhcpState::Renewing`].
     pub fn is_renewing(&self) -> bool {
         matches!(self, Self::Renewing)
     }
 
-    /// Returns `true` if the DHCP state is [`Rebinding`].
+    /// Returns `true` if the state is [`DhcpState::Rebinding`].
     pub fn is_rebinding(&self) -> bool {
         matches!(self, Self::Rebinding)
     }
@@ -176,6 +176,7 @@ pub struct Dhcp {
     ptr: &'static mut usize,
 }
 
+#[allow(clippy::clippy::len_without_is_empty)]
 impl Dhcp {
     /// Grab the statically allocated DHCP buffer.
     ///

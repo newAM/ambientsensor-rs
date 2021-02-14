@@ -9,9 +9,8 @@ Schematics, photos, ect. will be in that repository, this repository is just for
 This is still a work in progress.
 
 1. The OPT3002 luminosity sensor is not implemented.
-2. Logging needs to be hidden behind a feature flag for release builds.
-3. The panic handler needs to get hooked up to the EEPROM to store error logs then reset.
-4. Unit tests for DHCP/MQTT.
+2. The panic handler needs to get hooked up to the EEPROM to store error logs then reset.
+3. Unit tests for DHCP/MQTT.
 
 ## Purpose
 
