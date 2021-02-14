@@ -219,9 +219,19 @@ impl DhcpBuf {
         ))
     }
 
+    /// Returns the rebinding time (option 59) if it exists.
+    pub fn rebinding_time(&self) -> Option<u32> {
+        let idx: usize = self.find_option_index(DhcpOption::RebindingTime)?;
+        let size: u8 = self.buf[idx + 1];
+        debug_assert_eq!(size, 4);
+        Some(u32::from_be_bytes(
+            self.buf[idx + 2..idx + 6].try_into().unwrap(),
+        ))
+    }
+
     /// Returns the renewal time (option 58) if it exists.
     pub fn renewal_time(&self) -> Option<u32> {
-        let idx: usize = self.find_option_index(DhcpOption::SubnetMask)?;
+        let idx: usize = self.find_option_index(DhcpOption::RenewalTime)?;
         let size: u8 = self.buf[idx + 1];
         debug_assert_eq!(size, 4);
         Some(u32::from_be_bytes(

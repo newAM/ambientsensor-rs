@@ -16,7 +16,7 @@ jobs:
         with:
           toolchain: stable
           target: thumbv6m-none-eabi
-      - run: cargo build --verbose --target thumbv6m-none-eabi
+      - run: cargo build --verbose --target thumbv6m-none-eabi -- -D warnings
 
   clippy_check:
     name: Clippy

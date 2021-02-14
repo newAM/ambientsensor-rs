@@ -137,31 +137,6 @@ impl Instant {
     }
 }
 
-// pub struct ThisIsFine;
-
-// impl ThisIsFine {
-//     pub const fn new() -> ThisIsFine {
-//         ThisIsFine {}
-//     }
-// }
-
-// impl embedded_hal::blocking::delay::DelayMs<u16> for ThisIsFine {
-//     fn delay_ms(&mut self, ms: u16) {
-//         let instant: Instant = Instant::now();
-//         loop {
-//             if instant.elapsed() > ms.millis() {
-//                 break;
-//             }
-//         }
-//     }
-// }
-
-// impl embedded_hal::blocking::delay::DelayMs<u8> for ThisIsFine {
-//     fn delay_ms(&mut self, ms: u8) {
-//         ThisIsFine::new().delay_ms(ms as u16);
-//     }
-// }
-
 impl fmt::Debug for Instant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Instant")
