@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![allow(clippy::type_complexity)]
 
 mod bme280;
 mod monotonic;
@@ -11,11 +12,9 @@ use monotonic::{Instant, Tim6Monotonic, U16Ext};
 use mqtt::{Connack, ConnectCode, CtrlPacket, Publish, CONNACK_LEN};
 
 use core::fmt::Write;
-use core::sync::atomic::compiler_fence;
-use core::sync::atomic::Ordering::SeqCst;
+use core::sync::atomic::{compiler_fence, Ordering::SeqCst};
 use embedded_hal::digital::v2::OutputPin;
 use rtic::app;
-use rtt_target::{rprintln, rtt_init, ChannelMode, CriticalSectionFunc, UpChannel};
 use stm32f0xx_hal::{
     gpio::{
         self,
@@ -26,6 +25,7 @@ use stm32f0xx_hal::{
     i2c::I2c,
     pac::{EXTI, I2C1, SPI1},
     prelude::*,
+    serial::Serial,
     spi::{self, Spi},
 };
 
@@ -47,17 +47,60 @@ const TEMPERATURE_TOPIC: &str = "/home/ambient1/temperature";
 const HUMIDITY_TOPIC: &str = "/home/ambient1/humidity";
 const PRESSURE_TOPIC: &str = "/home/ambient1/pressure";
 
+// this is very inefficient logging, but it is only used for assertions.
+pub fn log_byte(byte: u8) {
+    const USART1_BASE: u32 = 0x4001_3800;
+
+    loop {
+        let isr = unsafe { core::ptr::read_volatile((USART1_BASE + 0x1C) as *mut u32) };
+        if (isr & (1 << 7)) != 0 {
+            break;
+        }
+    }
+
+    unsafe { core::ptr::write_volatile((USART1_BASE + 0x28) as *mut u32, u32::from(byte)) };
+}
+
+struct Logger;
+
+impl ::core::fmt::Write for Logger {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        s.as_bytes().iter().for_each(|x| log_byte(*x));
+        Ok(())
+    }
+}
+
+macro_rules! log {
+    ($msg:expr) => {
+        #[cfg(not(feature = "release"))]
+        {
+            log_always!($msg);
+        }
+    };
+    ($msg:expr, $($arg:tt)*) => {
+        #[cfg(not(feature = "release"))]
+        {
+            log_always!($msg, $($arg)*);
+        }
+    };
+}
+
+macro_rules! log_always {
+    ($msg:expr) => {
+        writeln!(&mut Logger, $msg).ok();
+        log_byte(b'\n')
+    };
+    ($msg:expr, $($arg:tt)*) => {
+        writeln!(&mut Logger, $msg, $($arg)*).ok();
+    };
+}
+
 #[panic_handler]
-#[cfg(target_arch = "arm")]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     cortex_m::interrupt::disable();
 
-    if let Some(mut channel) = unsafe { UpChannel::conjure(0) } {
-        channel.set_mode(ChannelMode::BlockIfFull);
-        writeln!(channel, "{}", info).ok();
-    }
-
     loop {
+        log_always!("{}", info);
         compiler_fence(SeqCst);
     }
 }
@@ -67,31 +110,9 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 fn HardFault(ef: &cortex_m_rt::ExceptionFrame) -> ! {
     cortex_m::interrupt::disable();
 
-    if let Some(mut channel) = unsafe { UpChannel::conjure(0) } {
-        channel.set_mode(ChannelMode::BlockIfFull);
-        writeln!(channel, "HARD FAULT {:#?}", ef).ok();
-    }
-
     loop {
+        log_always!("HARD FAULT {:#?}", ef);
         compiler_fence(SeqCst);
-    }
-}
-
-fn rtt_init() {
-    let channels = rtt_init! {
-        up: {
-            0: {
-                size: 1024
-                mode: BlockIfFull // NoBlockSkip
-                name: "Terminal"
-            }
-        }
-    };
-    unsafe {
-        rtt_target::set_print_channel_cs(
-            channels.up.0,
-            &((|arg, f| cortex_m::interrupt::free(|_| f(arg))) as CriticalSectionFunc),
-        );
     }
 }
 
@@ -168,7 +189,6 @@ pub fn nop_delay_ms(ms: usize) {
 )]
 const APP: () = {
     struct Resources {
-        #[allow(clippy::type_complexity)]
         w5500: W5500<
             Spi<
                 SPI1,
@@ -191,16 +211,12 @@ const APP: () = {
         dhcp_lease: Option<u32>,
         yiaddr: Ipv4Addr,
         mqtt_state: MqttState,
-        #[allow(clippy::type_complexity)]
         bme280: BME280<I2c<I2C1, PB6<gpio::Alternate<AF1>>, PB7<gpio::Alternate<AF1>>>>,
         xid: u32,
     }
 
     #[init(spawn = [dhcp_fsm, second_ticker], schedule = [mqtt_client])]
     fn init(cx: init::Context) -> init::LateResources {
-        rtt_init();
-        rprintln!("[TASK] init");
-
         // let cp = cx.core;
         let mut dp = cx.device;
         let mut rcc = {
@@ -217,7 +233,7 @@ const APP: () = {
         Tim6Monotonic::initialize(dp.TIM6);
 
         // hardware declaration
-        let ((eepom_cs, w5500_cs, mut w5500_rst), spi1_pins, spi2_pins, i2c1_pins) =
+        let ((eepom_cs, w5500_cs, mut w5500_rst), spi1_pins, spi2_pins, i2c1_pins, uart_pins) =
             cortex_m::interrupt::free(move |cs| {
                 gpiob.pb0.into_pull_down_input(cs); // INT
                 (
@@ -240,14 +256,22 @@ const APP: () = {
                         gpiob.pb6.into_alternate_af1(cs), // I2C SCL
                         gpiob.pb7.into_alternate_af1(cs), // I2C SDA
                     ),
+                    (
+                        gpioa.pa9.into_alternate_af1(cs),  // UART TX
+                        gpioa.pa10.into_alternate_af1(cs), // UART RX
+                    ),
                 )
             });
         let spi1 = Spi::spi1(dp.SPI1, spi1_pins, W5500_MODE, 1.mhz(), &mut rcc);
         let spi2 = Spi::spi2(dp.SPI2, spi2_pins, W5500_MODE, 1.mhz(), &mut rcc);
         let i2c = I2c::i2c1(dp.I2C1, i2c1_pins, 100.khz(), &mut rcc);
+        let mut serial = Serial::usart1(dp.USART1, uart_pins, 115_200.bps(), &mut rcc);
         let mut eeprom = eeprom25aa02e48::Eeprom25aa02e48::new(spi2, eepom_cs);
         let mut bme280 = BME280::new(i2c);
         let mut w5500 = W5500::new(spi1, w5500_cs);
+
+        writeln!(&mut serial, "Hello world!").ok();
+        log!("Hello world!");
 
         // get the MAC address from the EEPROM
         // the Microchip 25aa02e48 EEPROM comes pre-programmed with a valid MAC
@@ -257,14 +281,14 @@ const APP: () = {
         loop {
             eeprom.read_eui48(&mut mac.octets).unwrap();
             if mac == Eui48Addr::UNSPECIFIED || mac == BAD_MAC {
-                rprintln!("Failed to read the MAC address: {}", mac);
+                log!("Failed to read the MAC address: {}", mac);
                 nop_delay_ms(10);
             } else {
                 break;
             }
         }
         debug_assert_eq!(mac.octets[0], 0x54);
-        rprintln!("MAC: {}", mac);
+        log!("MAC: {}", mac);
 
         w5500_hl::ll::reset(&mut w5500_rst, &mut NopDelay::default()).unwrap();
 
@@ -286,7 +310,7 @@ const APP: () = {
         // continually initialize the W5500 until we link up
         // since we are using power over Ethernet we know that if the device
         // has power it also has an Ethernet cable connected.
-        let phy_cfg: PhyCfg = 'outer: loop {
+        let _phy_cfg: PhyCfg = 'outer: loop {
             // sanity check W5500 communications
             assert_eq!(w5500.version().unwrap(), w5500_hl::ll::VERSION);
 
@@ -296,7 +320,7 @@ const APP: () = {
 
             // wait for the PHY to indicate the Ethernet link is up
             let mut attempts: usize = 0;
-            rprintln!("Polling for link up");
+            log!("Polling for link up");
             let mut phy_cfg: PhyCfg = PhyCfg::default();
             phy_cfg.set_opmdc(OperationMode::FullDuplex10bt);
             w5500.set_phycfgr(phy_cfg).unwrap();
@@ -309,13 +333,13 @@ const APP: () = {
                     break 'outer phy_cfg;
                 }
                 if attempts >= LINK_UP_POLL_ATTEMPTS {
-                    rprintln!(
+                    log!(
                         "Failed to link up in {} ms",
                         attempts * LINK_UP_POLL_PERIOD_MILLIS,
                     );
                     break;
                 }
-                nop_delay_ms(100);
+                nop_delay_ms(LINK_UP_POLL_PERIOD_MILLIS);
                 attempts += 1;
             }
 
@@ -324,7 +348,7 @@ const APP: () = {
             w5500_rst.set_high().unwrap();
             nop_delay_ms(3);
         };
-        rprintln!("Done link up\n{}", phy_cfg);
+        log!("Done link up\n{}", _phy_cfg);
 
         // enable DHCP & MQTT socket interrupts
         w5500
@@ -357,7 +381,7 @@ const APP: () = {
 
     #[idle]
     fn idle(_: idle::Context) -> ! {
-        rprintln!("[TASK] idle");
+        log!("[TASK] idle");
         loop {
             compiler_fence(SeqCst);
         }
@@ -368,7 +392,7 @@ const APP: () = {
     /// The only interrupts we should get are for the DHCP & MQTT sockets.
     #[task(binds = EXTI0_1, resources = [exti, w5500, mqtt_state], spawn = [dhcp_fsm, mqtt_client])]
     fn exti0(cx: exti0::Context) {
-        rprintln!("[TASK] exti0");
+        log!("[TASK] exti0");
         let w5500: &mut W5500<_, _> = cx.resources.w5500;
         let exti: &mut EXTI = cx.resources.exti;
         let mqtt_state: &mut MqttState = cx.resources.mqtt_state;
@@ -384,40 +408,40 @@ const APP: () = {
                 match *socket {
                     DHCP_SOCKET => {
                         if sn_ir.con_raised() {
-                            rprintln!("[DHCP] INTERRUPT CON")
+                            log!("[DHCP] INTERRUPT CON");
                         }
                         if sn_ir.discon_raised() {
-                            rprintln!("[DHCP] INTERRUPT DISCON")
+                            log!("[DHCP] INTERRUPT DISCON");
                         }
                         if sn_ir.recv_raised() {
-                            rprintln!("[DHCP] INTERRUPT RECV");
+                            log!("[DHCP] INTERRUPT RECV");
                             cx.spawn.dhcp_fsm().unwrap()
                         }
                         if sn_ir.timeout_raised() {
-                            rprintln!("[DHCP] INTERRUPT TIMEOUT")
+                            log!("[DHCP] INTERRUPT TIMEOUT");
                         }
                         if sn_ir.sendok_raised() {
-                            rprintln!("[DHCP] INTERRUPT SENDOK")
+                            log!("[DHCP] INTERRUPT SENDOK");
                         }
                     }
                     MQTT_SOCKET => {
                         if sn_ir.discon_raised() | sn_ir.timeout_raised() {
-                            rprintln!("[MQTT] INTERRUPT DISCON/TIMEOUT");
+                            log!("[MQTT] INTERRUPT DISCON/TIMEOUT");
                             *mqtt_state = MqttState::Init;
                             if cx.spawn.mqtt_client().is_err() {
-                                rprintln!("[MQTT] already spawned");
+                                log!("[MQTT] already spawned");
                             }
                         } else if sn_ir.con_raised() {
-                            rprintln!("[MQTT] INTERRUPT CON");
+                            log!("[MQTT] INTERRUPT CON");
                             *mqtt_state = MqttState::ConInt;
                             if cx.spawn.mqtt_client().is_err() {
-                                rprintln!("[MQTT] already spawned");
+                                log!("[MQTT] already spawned");
                             }
                         } else if sn_ir.recv_raised() {
-                            rprintln!("[MQTT] INTERRUPT RECV");
+                            log!("[MQTT] INTERRUPT RECV");
                             *mqtt_state = MqttState::RecvInt;
                             if cx.spawn.mqtt_client().is_err() {
-                                rprintln!("[MQTT] already spawned");
+                                log!("[MQTT] already spawned");
                             }
                         }
                     }
@@ -451,12 +475,12 @@ const APP: () = {
 
         if let Some(timeout) = dhcp_timeout {
             if timeout.timeout_occured() {
-                rprintln!("[DHCP] timeout");
+                log!("[DHCP] timeout");
                 *dhcp_state = DhcpState::Init;
                 *dhcp_timeout = None;
                 spawn_dhcp_fsm = true;
             } else if timeout.state != *dhcp_state {
-                rprintln!("[DHCP] clearing timeout");
+                log!("[DHCP] clearing timeout");
                 *dhcp_timeout = None;
             }
         }
@@ -492,7 +516,7 @@ const APP: () = {
         resources = [w5500, dhcp_state, dhcp_timeout, mac, yiaddr, mqtt_state, xid, dhcp_t1, dhcp_t2, dhcp_lease]
     )]
     fn dhcp_fsm(cx: dhcp_fsm::Context) {
-        rprintln!("[TASK] dhcp_fsm");
+        log!("[TASK] dhcp_fsm");
         let w5500: &mut W5500<_, _> = cx.resources.w5500;
         let dhcp_state: &mut DhcpState = cx.resources.dhcp_state;
         let dhcp_timeout: &mut Option<DhcpTimeout> = cx.resources.dhcp_timeout;
@@ -508,7 +532,7 @@ const APP: () = {
 
         let mut dhcp_recv = || -> bool {
             let (num_bytes, _) = w5500.udp_recv_from(DHCP_SOCKET, dhcp_buf.recv()).unwrap();
-            rprintln!("Read {} bytes", num_bytes);
+            log!("Read {} bytes", num_bytes);
             assert!(
                 num_bytes < dhcp_buf.len(),
                 "Buffer was too small to receive all data"
@@ -516,10 +540,10 @@ const APP: () = {
             // TODO: handle buffer underrun
 
             if !dhcp_buf.is_bootreply() {
-                rprintln!("not a bootreply");
+                log!("not a bootreply");
                 true
             } else if dhcp_buf.xid() != *xid {
-                rprintln!(
+                log!(
                     "xid does not match: 0x{:08X} != 0x{:08X}",
                     dhcp_buf.xid(),
                     xid
@@ -530,13 +554,13 @@ const APP: () = {
             }
         };
 
-        rprintln!("[DHCP] {:?}", dhcp_state);
+        log!("[DHCP] {:?}", dhcp_state);
         match dhcp_state {
             DhcpState::Init => {
                 w5500.udp_bind(DHCP_SOCKET, DHCP_SOURCE_PORT).unwrap();
 
                 let discover: &[u8] = dhcp_buf.dhcp_discover(mac, HOSTNAME, xid);
-                rprintln!("[DHCP] SENDING DISCOVER");
+                log!("[DHCP] SENDING DISCOVER");
                 let tx_bytes: usize = w5500
                     .udp_send_to(DHCP_SOCKET, discover, &DHCP_DESTINATION)
                     .unwrap();
@@ -553,10 +577,10 @@ const APP: () = {
                 }
 
                 *yiaddr = dhcp_buf.yiaddr();
-                rprintln!("yiaddr: {}", yiaddr);
+                log!("yiaddr: {}", yiaddr);
 
                 let request: &[u8] = dhcp_buf.dhcp_request(mac, yiaddr, HOSTNAME, xid);
-                rprintln!("[DHCP] SENDING REQUEST");
+                log!("[DHCP] SENDING REQUEST");
                 let tx_bytes: usize = w5500.udp_send(DHCP_SOCKET, request).unwrap();
                 assert_eq!(tx_bytes, request.len());
 
@@ -580,12 +604,12 @@ const APP: () = {
                         *dhcp_t1 = Some(renewal_time);
                         *dhcp_t2 = Some(rebinding_time);
                         *dhcp_lease = Some(lease_time);
-                        rprintln!("Subnet Mask:    {}", subnet_mask);
-                        rprintln!("Client IP:      {}", *yiaddr);
-                        rprintln!("Gateway IP:     {}", gateway);
-                        rprintln!("Renewal Time:   {}s", renewal_time);
-                        rprintln!("Rebinding Time: {}s", rebinding_time);
-                        rprintln!("Lease Time:     {}s", lease_time);
+                        log!("Subnet Mask:    {}", subnet_mask);
+                        log!("Client IP:      {}", *yiaddr);
+                        log!("Gateway IP:     {}", gateway);
+                        log!("Renewal Time:   {}s", renewal_time);
+                        log!("Rebinding Time: {}s", rebinding_time);
+                        log!("Lease Time:     {}s", lease_time);
                         debug_assert_eq!(dhcp_buf.yiaddr(), *yiaddr);
                         w5500.set_subr(&subnet_mask).unwrap();
                         w5500.set_sipr(yiaddr).unwrap();
@@ -595,18 +619,18 @@ const APP: () = {
                         cx.spawn.mqtt_client().unwrap();
                     }
                     MsgType::Nak => {
-                        rprintln!("NAK");
+                        log!("NAK");
                         *dhcp_state = DhcpState::Init;
                         cx.spawn.dhcp_fsm().unwrap();
                     }
-                    x => {
-                        rprintln!("Ignoring message: {:?}", x);
+                    _x => {
+                        log!("Ignoring message: {:?}", _x);
                     }
                 }
             }
             DhcpState::Bound => {
                 let request: &[u8] = dhcp_buf.dhcp_request(mac, yiaddr, HOSTNAME, xid);
-                rprintln!("[DHCP] SENDING REQUEST");
+                log!("[DHCP] SENDING REQUEST");
                 let tx_bytes: usize = w5500.udp_send(DHCP_SOCKET, request).unwrap();
                 assert_eq!(tx_bytes, request.len());
 
@@ -622,7 +646,7 @@ const APP: () = {
 
     #[task(schedule = [mqtt_client], resources = [w5500, dhcp_state, mqtt_state, bme280])]
     fn mqtt_client(cx: mqtt_client::Context) {
-        rprintln!("[TASK] mqtt_client");
+        log!("[TASK] mqtt_client");
 
         let w5500: &mut W5500<_, _> = cx.resources.w5500;
         let dhcp_state: &mut DhcpState = cx.resources.dhcp_state;
@@ -634,7 +658,7 @@ const APP: () = {
             return;
         }
 
-        rprintln!("[MQTT] {:?}", mqtt_state);
+        log!("[MQTT] {:?}", mqtt_state);
         match mqtt_state {
             MqttState::Init => {
                 let mut sn_imr = SocketInterruptMask::default();
@@ -655,30 +679,30 @@ const APP: () = {
                 let rx_bytes: usize = w5500.tcp_read(MQTT_SOCKET, &mut connack.buf).unwrap();
                 // the server should only ever send us the CONNACK packet
                 if rx_bytes != CONNACK_LEN {
-                    rprintln!(
+                    log!(
                         "[MQTT] CONNACK buffer underrrun {}/{}",
                         rx_bytes,
                         CONNACK_LEN
                     );
                     *mqtt_state = MqttState::Init;
                 } else if connack.ctrl_pkt_type() != CtrlPacket::CONNACK.into() {
-                    rprintln!(
+                    log!(
                         "[MQTT] Excepted a CONNACK byte (0x{:02X}), found byte 0x{:02X}",
                         u8::from(CtrlPacket::CONNACK),
                         connack.ctrl_pkt_type()
                     );
                     *mqtt_state = MqttState::Init;
                 } else if connack.remaining_len() != 2 {
-                    rprintln!(
+                    log!(
                         "[MQTT] CONNACK remaining length is unexpected: {} (expected 2)",
                         connack.remaining_len()
                     );
                     *mqtt_state = MqttState::Init;
                 } else if connack.rc() == ConnectCode::ACCEPT.into() {
-                    rprintln!("[MQTT] CONNACK");
+                    log!("[MQTT] CONNACK");
                     *mqtt_state = MqttState::Happy;
                 } else {
-                    rprintln!("[MQTT] Unexpected CONNACK code: 0x{:02X}", connack.rc());
+                    log!("[MQTT] Unexpected CONNACK code: 0x{:02X}", connack.rc());
                     *mqtt_state = MqttState::Init;
                 }
 
@@ -688,7 +712,7 @@ const APP: () = {
             }
             MqttState::Happy => {
                 let sample = bme280.sample().unwrap();
-                rprintln!("{:#?}", sample);
+                log!("{:#?}", sample);
 
                 {
                     let mut publish: Publish = Publish::new();

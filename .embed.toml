@@ -7,7 +7,7 @@ chip = "stm32f070cbtx"
 speed = 1800
 
 [default.rtt]
-enabled = true
+enabled = false
 log_enabled = true
 
 [default.gdb]

@@ -8,7 +8,7 @@ name: CI
 
 jobs:
   build:
-    name: Compile Check
+    name: Debug Compile Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -17,6 +17,17 @@ jobs:
           toolchain: stable
           target: thumbv6m-none-eabi
       - run: RUSTFLAGS="-D warnings" cargo build --target thumbv6m-none-eabi
+  
+  build_release:
+    name: Release Compile Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: thumbv6m-none-eabi
+      - run: RUSTFLAGS="-D warnings" cargo build --target thumbv6m-none-eabi --release --features release
 
   test:
     name: Unit Tests
@@ -41,7 +52,7 @@ jobs:
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features --target thumbv6m-none-eabi
+          args: --target thumbv6m-none-eabi
 
   format_check:
     name: Rust Format

@@ -4,11 +4,13 @@ version = "0.1.0"
 authors = ["Alex M. <alexmgit@protonmail.com>"]
 edition = "2018"
 
+[features]
+release = []
+
 [dependencies]
 cortex-m = "~0.7.1"
 cortex-m-rt = "~0.6.13"
 embedded-hal = "~0.2.4"
-rtt-target = { version = "~0.3.0", features = ["cortex-m"] }
 cortex-m-rtic = "~0.5.5"
 eeprom25aa02e48 = "~0.1.0"
 dhcp = { path = "dhcp" }
