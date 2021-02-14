@@ -11,6 +11,7 @@ This is still a work in progress.
 1. The OPT3002 luminosity sensor is not implemented.
 2. Logging needs to be hidden behind a feature flag for release builds.
 3. The panic handler needs to get hooked up to the EEPROM to store error logs then reset.
+4. Unit tests for DHCP/MQTT.
 
 ## Purpose
 
@@ -20,7 +21,7 @@ On paper rust seems amazing, but the only way to really evaluate a language is t
 
 Turns out, the hype was warranted.
 
-There is not a lot of commentary I can offer about embedded rust that has not already been said.  The concepts rust introduces (safety, ownership, lifetimes) make developing robust code simple.  The language is new and still has a small (but rapidly growing) ecosystem for embedded development.  From my experience a lot of embedded development is still C simply because nothing else (except C++ depending on who you ask) offers a compelling reason to switch.  The features rust brings to the table are incredibly compelling for embedded development, and I think rust has a bright future in this industry.
+There is not a lot of commentary I can offer about embedded rust that has not already been said.  The concepts rust introduces (safety, ownership, lifetimes) make developing robust code simple.  The language is new and still has a small (but rapidly growing) ecosystem for embedded development.  From my experience a lot of embedded development is still C simply because nothing else offers a compelling reason to switch (except C++ depending on who you ask).  The features rust brings to the table are incredibly compelling for embedded development, and I think rust has a bright future in this industry.
 
 ## Notable crates used
 
@@ -42,7 +43,7 @@ You will need [rustup] and the `thumbv6m-none-eabi` target.
 rustup target add thumbv6m-none-eabi
 ```
 
-After you have that target available simply build, the default target is already set in `.cargo/config.toml`.
+After you have that target available you can build, the default target is already set in `.cargo/config.toml`.
 ```bash
 cargo build
 ```
