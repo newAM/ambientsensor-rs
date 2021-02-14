@@ -2,12 +2,11 @@
 #![no_main]
 
 mod bme280;
-mod dhcp;
 mod monotonic;
 mod mqtt;
 
 use bme280::BME280;
-use dhcp::{DhcpBuf, DhcpState, MsgType, DHCP_DESTINATION, DHCP_SOURCE_PORT};
+use dhcp::{Dhcp, DhcpState, MsgType, DHCP_DESTINATION, DHCP_SOURCE_PORT};
 use monotonic::{Instant, Tim6Monotonic, U16Ext};
 use mqtt::{Connack, ConnectCode, CtrlPacket, Publish, CONNACK_LEN};
 
@@ -188,6 +187,8 @@ const APP: () = {
         dhcp_t1: Option<u32>,
         /// Timer for rebinding.
         dhcp_t2: Option<u32>,
+        /// Timer for the lease.
+        dhcp_lease: Option<u32>,
         yiaddr: Ipv4Addr,
         mqtt_state: MqttState,
         #[allow(clippy::type_complexity)]
@@ -325,8 +326,10 @@ const APP: () = {
         };
         rprintln!("Done link up\n{}", phy_cfg);
 
-        // enable all the socket interrupts
-        w5500.set_simr(0xFF).unwrap();
+        // enable DHCP & MQTT socket interrupts
+        w5500
+            .set_simr((1 << u8::from(DHCP_SOCKET)) | (1 << u8::from(MQTT_SOCKET)))
+            .unwrap();
 
         // start the DHCP task
         cx.spawn.dhcp_fsm().unwrap();
@@ -339,9 +342,10 @@ const APP: () = {
             w5500: w5500,
             exti: exti,
             dhcp_timeout: None,
-            dhcp_state: DhcpState::INIT,
+            dhcp_state: DhcpState::Init,
             dhcp_t1: None,
             dhcp_t2: None,
+            dhcp_lease: None,
             mac: mac,
             yiaddr: Ipv4Addr::UNSPECIFIED,
             mqtt_state: MqttState::Init,
@@ -362,7 +366,6 @@ const APP: () = {
     /// This is the W5500 interrupt.
     ///
     /// The only interrupts we should get are for the DHCP & MQTT sockets.
-    /// Other interrupts are left unmasked because I like to live dangerously.
     #[task(binds = EXTI0_1, resources = [exti, w5500, mqtt_state], spawn = [dhcp_fsm, mqtt_client])]
     fn exti0(cx: exti0::Context) {
         rprintln!("[TASK] exti0");
@@ -418,7 +421,7 @@ const APP: () = {
                             }
                         }
                     }
-                    _ => unimplemented!("{:?}", socket),
+                    _ => unreachable!("{:?}", socket),
                 }
                 sir &= !mask;
             }
@@ -430,45 +433,63 @@ const APP: () = {
         exti.pr.write(|w| w.pr0().set_bit());
     }
 
-    // Timers cannot be canceled in RTIC (yet).
-    //
-    // This handles long timers, such as DHCP timeouts and DHCP renewal / rebinding.
-    #[task(schedule = [second_ticker], spawn = [dhcp_fsm], resources = [dhcp_state, dhcp_timeout, dhcp_t1])]
+    /// This handles long timers:
+    ///
+    /// * DHCP FSM timeouts
+    /// * DHCP T1 (renewal)
+    /// * DHCP T2 (rebinding)
+    /// * DHCP Lease
+    #[task(schedule = [second_ticker], spawn = [dhcp_fsm], resources = [dhcp_state, dhcp_timeout, dhcp_t1, dhcp_t2, dhcp_lease])]
     fn second_ticker(cx: second_ticker::Context) {
         let dhcp_state: &mut DhcpState = cx.resources.dhcp_state;
         let dhcp_timeout: &mut Option<DhcpTimeout> = cx.resources.dhcp_timeout;
         let dhcp_t1: &mut Option<u32> = cx.resources.dhcp_t1;
+        let dhcp_t2: &mut Option<u32> = cx.resources.dhcp_t2;
+        let dhcp_lease: &mut Option<u32> = cx.resources.dhcp_lease;
+
+        let mut spawn_dhcp_fsm: bool = false;
 
         if let Some(timeout) = dhcp_timeout {
             if timeout.timeout_occured() {
                 rprintln!("[DHCP] timeout");
-                *dhcp_state = DhcpState::INIT;
+                *dhcp_state = DhcpState::Init;
                 *dhcp_timeout = None;
-                cx.spawn.dhcp_fsm().unwrap();
+                spawn_dhcp_fsm = true;
             } else if timeout.state != *dhcp_state {
                 rprintln!("[DHCP] clearing timeout");
                 *dhcp_timeout = None;
             }
         }
 
-        if let Some(remaining) = dhcp_t1 {
-            *remaining = remaining.saturating_sub(1);
-            if *remaining == 0 {
-                // TODO: go to the RENEWING state
-                *dhcp_state = DhcpState::INIT;
-                *dhcp_t1 = None;
-                cx.spawn.dhcp_fsm().unwrap();
+        let mut decrement_dhcp_timer = |t: &mut Option<u32>, init: bool| {
+            if let Some(remaining) = t {
+                *remaining = remaining.saturating_sub(1);
+                if *remaining == 0 {
+                    *t = None;
+                    spawn_dhcp_fsm = true;
+                    if init {
+                        *dhcp_state = DhcpState::Init;
+                    }
+                }
             }
+        };
+
+        decrement_dhcp_timer(dhcp_t1, false);
+        decrement_dhcp_timer(dhcp_t2, false);
+        decrement_dhcp_timer(dhcp_lease, true);
+
+        if spawn_dhcp_fsm {
+            cx.spawn.dhcp_fsm().unwrap();
         }
 
         cx.schedule
-            .second_ticker(Instant::now() + 1000u16.millis())
+            .second_ticker(cx.scheduled + 1000u16.millis())
             .unwrap();
     }
 
     #[task(
-        spawn = [mqtt_client],
-        resources = [w5500, dhcp_state, dhcp_timeout, mac, yiaddr, mqtt_state, xid, dhcp_t1, dhcp_t2]
+        spawn = [mqtt_client, dhcp_fsm],
+        resources = [w5500, dhcp_state, dhcp_timeout, mac, yiaddr, mqtt_state, xid, dhcp_t1, dhcp_t2, dhcp_lease]
     )]
     fn dhcp_fsm(cx: dhcp_fsm::Context) {
         rprintln!("[TASK] dhcp_fsm");
@@ -477,59 +498,56 @@ const APP: () = {
         let dhcp_timeout: &mut Option<DhcpTimeout> = cx.resources.dhcp_timeout;
         let dhcp_t1: &mut Option<u32> = cx.resources.dhcp_t1;
         let dhcp_t2: &mut Option<u32> = cx.resources.dhcp_t2;
+        let dhcp_lease: &mut Option<u32> = cx.resources.dhcp_lease;
         let mac: &mut Eui48Addr = cx.resources.mac;
         let yiaddr: &mut Ipv4Addr = cx.resources.yiaddr;
         let mqtt_state: &mut MqttState = cx.resources.mqtt_state;
         let xid: &mut u32 = cx.resources.xid;
 
-        let mut dhcp_buf = unsafe { DhcpBuf::steal() };
+        let mut dhcp_buf = unsafe { Dhcp::steal() };
 
         let mut dhcp_recv = || -> bool {
-            let (num_bytes, _) = w5500.udp_recv_from(DHCP_SOCKET, &mut dhcp_buf.buf).unwrap();
+            let (num_bytes, _) = w5500.udp_recv_from(DHCP_SOCKET, dhcp_buf.recv()).unwrap();
             rprintln!("Read {} bytes", num_bytes);
             assert!(
-                num_bytes < dhcp_buf.buf.len(),
+                num_bytes < dhcp_buf.len(),
                 "Buffer was too small to receive all data"
             );
             // TODO: handle buffer underrun
 
             if !dhcp_buf.is_bootreply() {
                 rprintln!("not a bootreply");
-                return true;
-            }
-
-            if dhcp_buf.xid() != *xid {
+                true
+            } else if dhcp_buf.xid() != *xid {
                 rprintln!(
                     "xid does not match: 0x{:08X} != 0x{:08X}",
                     dhcp_buf.xid(),
                     xid
                 );
-                return true;
+                true
+            } else {
+                false
             }
-
-            false
         };
 
         rprintln!("[DHCP] {:?}", dhcp_state);
         match dhcp_state {
-            DhcpState::INIT => {
+            DhcpState::Init => {
                 w5500.udp_bind(DHCP_SOCKET, DHCP_SOURCE_PORT).unwrap();
 
-                dhcp_buf.dhcp_discover(mac, HOSTNAME);
-                dhcp_buf.set_xid(*xid);
-                debug_assert_eq!(dhcp_buf.xid(), *xid);
+                let discover: &[u8] = dhcp_buf.dhcp_discover(mac, HOSTNAME, xid);
                 rprintln!("[DHCP] SENDING DISCOVER");
-                let tx_bytes = w5500
-                    .udp_send_to(DHCP_SOCKET, dhcp_buf.tx_data(), &DHCP_DESTINATION)
+                let tx_bytes: usize = w5500
+                    .udp_send_to(DHCP_SOCKET, discover, &DHCP_DESTINATION)
                     .unwrap();
-                assert_eq!(tx_bytes, dhcp_buf.tx_data_len());
+                assert_eq!(tx_bytes, discover.len());
 
-                *dhcp_state = DhcpState::SELECTING;
+                *dhcp_state = DhcpState::Selecting;
 
                 // start timeout tracker
                 *dhcp_timeout = Some(DhcpTimeout::new(*dhcp_state));
             }
-            DhcpState::SELECTING => {
+            DhcpState::Selecting => {
                 if dhcp_recv() {
                     return;
                 }
@@ -537,18 +555,17 @@ const APP: () = {
                 *yiaddr = dhcp_buf.yiaddr();
                 rprintln!("yiaddr: {}", yiaddr);
 
-                dhcp_buf.dhcp_request(mac, yiaddr, HOSTNAME);
-                dhcp_buf.set_xid(*xid);
+                let request: &[u8] = dhcp_buf.dhcp_request(mac, yiaddr, HOSTNAME, xid);
                 rprintln!("[DHCP] SENDING REQUEST");
-                let tx_bytes = w5500.udp_send(DHCP_SOCKET, dhcp_buf.tx_data()).unwrap();
-                assert_eq!(tx_bytes, dhcp_buf.tx_data_len());
+                let tx_bytes: usize = w5500.udp_send(DHCP_SOCKET, request).unwrap();
+                assert_eq!(tx_bytes, request.len());
 
-                *dhcp_state = DhcpState::REQUESTING;
+                *dhcp_state = DhcpState::Requesting;
 
                 // start timeout tracker
                 *dhcp_timeout = Some(DhcpTimeout::new(*dhcp_state));
             }
-            DhcpState::REQUESTING => {
+            DhcpState::Requesting | DhcpState::Renewing | DhcpState::Rebinding => {
                 if dhcp_recv() {
                     return;
                 }
@@ -559,32 +576,46 @@ const APP: () = {
                         let gateway: Ipv4Addr = dhcp_buf.dhcp_server().unwrap();
                         let renewal_time: u32 = dhcp_buf.renewal_time().unwrap();
                         let rebinding_time: u32 = dhcp_buf.rebinding_time().unwrap();
+                        let lease_time: u32 = dhcp_buf.lease_time().unwrap();
                         *dhcp_t1 = Some(renewal_time);
                         *dhcp_t2 = Some(rebinding_time);
+                        *dhcp_lease = Some(lease_time);
                         rprintln!("Subnet Mask:    {}", subnet_mask);
                         rprintln!("Client IP:      {}", *yiaddr);
                         rprintln!("Gateway IP:     {}", gateway);
                         rprintln!("Renewal Time:   {}s", renewal_time);
                         rprintln!("Rebinding Time: {}s", rebinding_time);
+                        rprintln!("Lease Time:     {}s", lease_time);
                         debug_assert_eq!(dhcp_buf.yiaddr(), *yiaddr);
                         w5500.set_subr(&subnet_mask).unwrap();
                         w5500.set_sipr(yiaddr).unwrap();
                         w5500.set_gar(&gateway).unwrap();
-                        *dhcp_state = DhcpState::BOUND;
+                        *dhcp_state = DhcpState::Bound;
                         *mqtt_state = MqttState::Init;
                         cx.spawn.mqtt_client().unwrap();
                     }
                     MsgType::Nak => {
                         rprintln!("NAK");
-                        *dhcp_state = DhcpState::INIT;
+                        *dhcp_state = DhcpState::Init;
+                        cx.spawn.dhcp_fsm().unwrap();
                     }
                     x => {
                         rprintln!("Ignoring message: {:?}", x);
                     }
                 }
             }
-            // lease timer is handled by second_ticker
-            DhcpState::BOUND => {}
+            DhcpState::Bound => {
+                let request: &[u8] = dhcp_buf.dhcp_request(mac, yiaddr, HOSTNAME, xid);
+                rprintln!("[DHCP] SENDING REQUEST");
+                let tx_bytes: usize = w5500.udp_send(DHCP_SOCKET, request).unwrap();
+                assert_eq!(tx_bytes, request.len());
+
+                if dhcp_t2.is_none() {
+                    *dhcp_state = DhcpState::Rebinding
+                } else if dhcp_t1.is_none() {
+                    *dhcp_state = DhcpState::Renewing
+                }
+            }
             x => todo!("[DHCP] {:?}", x),
         }
     }
@@ -598,7 +629,7 @@ const APP: () = {
         let mqtt_state: &mut MqttState = cx.resources.mqtt_state;
         let bme280: &mut BME280<_> = cx.resources.bme280;
 
-        if *dhcp_state != DhcpState::BOUND {
+        if !dhcp_state.has_lease() {
             // we will be spawned when the DHCP client binds
             return;
         }

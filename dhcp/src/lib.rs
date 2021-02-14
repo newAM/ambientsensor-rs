@@ -1,31 +1,72 @@
-//! Do as I say, not as I do.
-//! Do not write your own DHCP code.
-//!
-//! I implemented my own DHCP client for reasons that are not applicable to
-//! a production product:
-//!
-//! 1. Fun
-//! 2. Learning
-//!
-//! This is pretty low-effort code here.
-//! Minimum viable product sort of thing.
+#![no_std]
+
 use core::convert::{TryFrom, TryInto};
-use w5500_hl::net::{Eui48Addr, Ipv4Addr, SocketAddrV4};
+use w5500_ll::net::{Eui48Addr, Ipv4Addr, SocketAddrV4};
 
 /// DHCP state.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum DhcpState {
-    INIT,
-    SELECTING,
-    REQUESTING,
-    INITREBOOT,
-    REBOOTING,
-    BOUND,
-    RENEWING,
-    REBINDING,
+    /// Initial DHCP state.
+    Init,
+    Selecting,
+    Requesting,
+    InitReboot,
+    Rebooting,
+    Bound,
+    Renewing,
+    Rebinding,
 }
 
-/// DHCP message types (RFC 2132)
+impl DhcpState {
+    /// Returns `true` if the DHCP state is [`Init`].
+    pub fn is_init(&self) -> bool {
+        matches!(self, Self::Init)
+    }
+
+    /// Returns `true` if the DHCP state is [`Selecting`].
+    pub fn is_selecting(&self) -> bool {
+        matches!(self, Self::Selecting)
+    }
+
+    /// Returns `true` if the DHCP state is [`Requesting`].
+    pub fn is_requesting(&self) -> bool {
+        matches!(self, Self::Requesting)
+    }
+
+    /// Returns `true` if the dhcp_state is [`InitReboot`].
+    pub fn is_init_reboot(&self) -> bool {
+        matches!(self, Self::InitReboot)
+    }
+
+    /// Returns `true` if the DHCP state is [`Rebooting`].
+    pub fn is_rebooting(&self) -> bool {
+        matches!(self, Self::Rebooting)
+    }
+
+    /// Returns `true` if the DHCP state is [`Bound`].
+    pub fn is_bound(&self) -> bool {
+        matches!(self, Self::Bound)
+    }
+
+    /// Returns `true` if the DHCP state is [`Renewing`].
+    pub fn is_renewing(&self) -> bool {
+        matches!(self, Self::Renewing)
+    }
+
+    /// Returns `true` if the DHCP state is [`Rebinding`].
+    pub fn is_rebinding(&self) -> bool {
+        matches!(self, Self::Rebinding)
+    }
+
+    /// Returns `true` if there is a valid IP lease in this state
+    pub fn has_lease(&self) -> bool {
+        matches!(self, Self::Bound | Self::Renewing | Self::Rebinding)
+    }
+}
+
+/// DHCP message types.
+///
+/// From [RFC 2132 Section 9.6](https://tools.ietf.org/html/rfc2132#section-9.6)
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum MsgType {
@@ -44,7 +85,7 @@ impl From<MsgType> for u8 {
     }
 }
 
-/// DHCP options (RFC 2132)
+/// DHCP options.
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq)]
 #[allow(dead_code)]
@@ -57,6 +98,9 @@ enum DhcpOption {
     NameServer = 5,
     Dns = 6,
     Hostname = 12,
+    /// Requested IP Address
+    ///
+    /// From [RFC 2132 Section 9.1](https://tools.ietf.org/html/rfc2132#section-9.1)
     RequestedIp = 50,
     LeaseTime = 51,
     MessageType = 53,
@@ -64,6 +108,9 @@ enum DhcpOption {
     ParameterRequest = 55,
     RenewalTime = 58,
     RebindingTime = 59,
+    /// Client-identifier
+    ///
+    /// From [RFC 2132 Section 9.14](https://tools.ietf.org/html/rfc2132#section-9.14)
     ClientId = 61,
     End = 255,
 }
@@ -73,13 +120,31 @@ impl From<DhcpOption> for u8 {
     }
 }
 
+/// DHCP op code (message type)
+///
+/// From [RFC 2131 Section 2](https://tools.ietf.org/html/rfc2131#section-2)
 #[repr(u8)]
-enum DhcpOp {
+pub enum OpCode {
     BOOTREQUEST = 1,
     BOOTREPLY = 2,
 }
-impl From<DhcpOp> for u8 {
-    fn from(val: DhcpOp) -> u8 {
+impl From<OpCode> for u8 {
+    fn from(val: OpCode) -> u8 {
+        val as u8
+    }
+}
+
+/// DHCP hardware type.
+///
+/// See [RFC 1700](https://tools.ietf.org/html/rfc1700)
+#[repr(u8)]
+#[non_exhaustive]
+pub enum HardwareType {
+    Ethernet = 1,
+    // lots of others that I do not care about
+}
+impl From<HardwareType> for u8 {
+    fn from(val: HardwareType) -> u8 {
         val as u8
     }
 }
@@ -89,54 +154,130 @@ pub const DHCP_SOURCE_PORT: u16 = 68;
 pub const DHCP_DESTINATION: SocketAddrV4 =
     SocketAddrV4::new(Ipv4Addr::BROADCAST, DHCP_DESTINATION_PORT);
 
-const HTYPE10MB: u8 = 1;
-/// Server name size.
-const SNAME_SIZE: usize = 64;
-/// Boot filename size
-const FILE_SIZE: usize = 128;
+const HW_ADDR_LEN: u8 = 6;
+
+// Server name size.
+// const SNAME_SIZE: usize = 64;
+// Boot filename size
+// const FILE_SIZE: usize = 128;
 const MAGIC_COOKIE: [u8; 4] = [0x63, 0x82, 0x53, 0x63];
 
-pub const BUF_SIZE: usize = 548;
-static mut DHCP_BUF: [u8; BUF_SIZE] = [0; BUF_SIZE];
+/// Fixed DHCP packet buffer size.
+pub const BUF_SIZE: usize = 600;
 
-pub struct DhcpBuf {
-    pub buf: [u8; BUF_SIZE],
-    buf_ptr: usize,
+/// This is a large buffer, so it is declared as a static global.
+static mut DHCP_BUF: [u8; BUF_SIZE] = [0; BUF_SIZE];
+/// Pointer for filling up the buffer.
+static mut DHCP_BUF_PTR: usize = 0;
+
+/// DHCP packet buffer.
+pub struct Dhcp {
+    buf: &'static mut [u8; BUF_SIZE],
+    ptr: &'static mut usize,
 }
 
-impl DhcpBuf {
+impl Dhcp {
     /// Grab the statically allocated DHCP buffer.
-    pub unsafe fn steal() -> DhcpBuf {
-        DhcpBuf {
-            buf: DHCP_BUF,
-            buf_ptr: 0,
+    ///
+    /// # Safety
+    ///
+    /// Ensure the consumer of the buffer has exclusive access.
+    /// The buffer is global mutable state, which is a big no-no in rust.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dhcp::Dhcp;
+    ///
+    /// let buf: Dhcp = unsafe { Dhcp::steal() };
+    /// ```
+    pub unsafe fn steal() -> Dhcp {
+        Dhcp {
+            buf: &mut DHCP_BUF,
+            ptr: &mut DHCP_BUF_PTR,
         }
     }
 
     /// Zero out the buffer.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dhcp::Dhcp;
+    ///
+    /// let mut buf: Dhcp = unsafe { Dhcp::steal() };
+    /// buf.zero();
+    /// ```
     pub fn zero(&mut self) {
-        for byte in self.buf.iter_mut() {
-            *byte = 0;
-        }
-        self.buf_ptr = 0;
+        self.buf.iter_mut().for_each(|x| *x = 0);
+        *self.ptr = 0;
     }
 
+    /// Set the message type (op code)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dhcp::{Dhcp, OpCode};
+    ///
+    /// let mut buf: Dhcp = unsafe { Dhcp::steal() };
+    ///
+    /// buf.set_op(OpCode::BOOTREQUEST);
+    /// assert!(buf.is_bootrequest());
+    /// assert!(!buf.is_bootreply());
+    ///
+    /// buf.set_op(OpCode::BOOTREPLY);
+    /// assert!(!buf.is_bootrequest());
+    /// assert!(buf.is_bootreply());
+    /// ```
+    pub fn set_op(&mut self, op: OpCode) {
+        self.buf[0] = op.into()
+    }
+
+    /// Returns `true` if the message type is a bootrequest.
+    pub fn is_bootrequest(&self) -> bool {
+        self.buf[0] == OpCode::BOOTREQUEST.into()
+    }
+
+    /// Returns `true` if the message type is a bootreply.
     pub fn is_bootreply(&self) -> bool {
-        self.buf[0] == DhcpOp::BOOTREPLY.into()
+        self.buf[0] == OpCode::BOOTREPLY.into()
+    }
+
+    /// Set the hardware type to Ethernet.
+    fn set_htype_ethernet(&mut self) {
+        self.buf[1] = HardwareType::Ethernet.into()
+    }
+
+    /// Returns `true` if the hardware type is Ethernet.
+    pub fn is_htype_ethernet(&self) -> bool {
+        self.buf[1] == HardwareType::Ethernet.into()
     }
 
     /// Transaction ID.
     pub fn xid(&self) -> u32 {
-        u32::from_be_bytes(self.buf[4..8].try_into().unwrap())
+        u32::from_be_bytes([self.buf[4], self.buf[5], self.buf[6], self.buf[7]])
     }
 
-    /// Set the transaction ID
-    pub fn set_xid(&mut self, xid: u32) {
+    /// Set the transaction ID.
+    pub fn set_xid(&mut self, xid: &u32) {
         let bytes: [u8; 4] = xid.to_be_bytes();
         self.buf[4] = bytes[0];
         self.buf[5] = bytes[1];
         self.buf[6] = bytes[2];
         self.buf[7] = bytes[3];
+    }
+
+    /// Set the magic cookie.
+    ///
+    /// Sets the first four octets of the options field to 99, 138, 83, 99.
+    ///
+    /// From [RFC 2131 Section 3](https://tools.ietf.org/html/rfc2131#section-3)
+    fn set_magic_cookie(&mut self) {
+        MAGIC_COOKIE
+            .iter()
+            .enumerate()
+            .for_each(|(idx, byte)| self.buf[idx + 236] = *byte)
     }
 
     /// client IP address;
@@ -239,6 +380,16 @@ impl DhcpBuf {
         ))
     }
 
+    /// Returns the lease time (option 51) if it exists.
+    pub fn lease_time(&self) -> Option<u32> {
+        let idx: usize = self.find_option_index(DhcpOption::LeaseTime)?;
+        let size: u8 = self.buf[idx + 1];
+        debug_assert_eq!(size, 4);
+        Some(u32::from_be_bytes(
+            self.buf[idx + 2..idx + 6].try_into().unwrap(),
+        ))
+    }
+
     /// Returns the DHCP server identifier (option 54) if it exists
     pub fn dhcp_server(&self) -> Option<Ipv4Addr> {
         let idx: usize = self.find_option_index(DhcpOption::ServerId)?;
@@ -252,47 +403,31 @@ impl DhcpBuf {
         ))
     }
 
-    /// Writes boilerplate for a DHCP pakcet to the W5500.
-    fn prepare_message(&mut self, mac: &Eui48Addr) {
+    /// Prepares the buffer for a new DHCP message.
+    ///
+    /// From [RFC 2131 Section 2](https://tools.ietf.org/html/rfc2131#section-2)
+    fn prepare_message(&mut self, mac: &Eui48Addr, xid: &u32) {
         self.zero();
-        self.buf[0] = DhcpOp::BOOTREQUEST.into();
-        self.buf[1] = HTYPE10MB;
+        self.set_op(OpCode::BOOTREQUEST);
+        self.set_htype_ethernet();
         self.buf[2] = 6; // hardware address (EUI-48 MAC) length
         self.buf[3] = 0; // hops
-        self.buf[4] = 0x12; // xid
-        self.buf[5] = 0x34; // xid
-        self.buf[6] = 0x56; // xid
-        self.buf[7] = 0x78; // xid
-        self.buf[8] = 0x00; // sec
-        self.buf[9] = 0x00; // sec
-        self.buf[10] = 0x00; // flags
-        self.buf[11] = 0x00; // flags
-        for x in 12..29 {
-            self.buf[x] = 0x00;
-        }
+        self.set_xid(xid);
+        self.buf[10] = 0x80; // broadcast flag
         self.buf[29] = mac.octets[0];
         self.buf[30] = mac.octets[1];
         self.buf[31] = mac.octets[2];
         self.buf[32] = mac.octets[3];
         self.buf[33] = mac.octets[4];
         self.buf[34] = mac.octets[5];
-
-        for x in 0..SNAME_SIZE {
-            self.buf[35 + x] = 0x00;
-        }
-        for x in 0..FILE_SIZE {
-            self.buf[108 + x] = 0x00;
-        }
-        for (idx, byte) in MAGIC_COOKIE.iter().enumerate() {
-            self.buf[idx + 236] = *byte;
-        }
-        self.buf_ptr = 240;
+        self.set_magic_cookie();
+        *self.ptr = 240;
     }
 
     #[inline(always)]
     fn write_buf(&mut self, data: u8) {
-        self.buf[self.buf_ptr] = data;
-        self.buf_ptr += 1
+        self.buf[*self.ptr] = data;
+        *self.ptr += 1
     }
 
     fn option_message_type(&mut self, msg_type: MsgType) {
@@ -303,14 +438,9 @@ impl DhcpBuf {
 
     fn option_client_identifier(&mut self, mac: &Eui48Addr) {
         self.write_buf(DhcpOption::ClientId.into());
-        self.write_buf(7);
-        self.write_buf(HTYPE10MB);
-        self.write_buf(mac.octets[0]);
-        self.write_buf(mac.octets[1]);
-        self.write_buf(mac.octets[2]);
-        self.write_buf(mac.octets[3]);
-        self.write_buf(mac.octets[4]);
-        self.write_buf(mac.octets[5])
+        self.write_buf(HW_ADDR_LEN + 1);
+        self.write_buf(HardwareType::Ethernet.into());
+        mac.octets.iter().for_each(|o| self.write_buf(*o));
     }
 
     fn option_hostname(&mut self, hostname: &str) {
@@ -345,33 +475,48 @@ impl DhcpBuf {
     }
 
     /// Create a DHCP discover.
-    pub fn dhcp_discover(&mut self, mac: &Eui48Addr, hostname: &str) {
-        self.prepare_message(mac);
-        self.buf[10] = 0x80; // Broadcast
+    pub fn dhcp_discover(&mut self, mac: &Eui48Addr, hostname: &str, xid: &u32) -> &[u8] {
+        self.prepare_message(mac, xid);
         self.option_message_type(MsgType::Discover);
         self.option_client_identifier(mac);
         self.option_hostname(hostname);
-        // self.option_parameter_request();
         self.option_end();
+        &self.buf[..*self.ptr]
     }
 
     /// Create a DHCP request.
-    pub fn dhcp_request(&mut self, mac: &Eui48Addr, ip: &Ipv4Addr, hostname: &str) {
-        self.prepare_message(mac);
-        self.buf[10] = 0x80; // Broadcast
+    pub fn dhcp_request(
+        &mut self,
+        mac: &Eui48Addr,
+        ip: &Ipv4Addr,
+        hostname: &str,
+        xid: &u32,
+    ) -> &[u8] {
+        self.prepare_message(mac, xid);
         self.option_message_type(MsgType::Request);
         self.option_client_identifier(mac);
         self.option_hostname(hostname);
         self.option_parameter_request();
         self.option_requested_ip(ip);
         self.option_end();
+        &self.buf[..*self.ptr]
     }
 
-    pub fn tx_data(&self) -> &[u8] {
-        &self.buf[..self.buf_ptr]
+    pub fn recv(&mut self) -> &mut [u8] {
+        self.buf
     }
 
-    pub fn tx_data_len(&self) -> usize {
-        self.buf_ptr
+    /// Maximum length of the DHCP buffer in bytes.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dhcp::Dhcp;
+    ///
+    /// let buf: Dhcp = unsafe { Dhcp::steal() };
+    /// assert_eq!(buf.len(), 600);
+    /// ```
+    pub const fn len(&self) -> usize {
+        BUF_SIZE
     }
 }
