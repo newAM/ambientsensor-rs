@@ -16,6 +16,7 @@ dependencies = [
  "cortex-m 0.7.1",
  "cortex-m-rt",
  "cortex-m-rtic",
+ "dhcp",
  "eeprom25aa02e48",
  "embedded-hal",
  "rtt-target",
@@ -147,6 +148,13 @@ dependencies = [
  "quote",
  "rtic-syntax",
  "syn",
+]
+
+[[package]]
+name = "dhcp"
+version = "0.1.0"
+dependencies = [
+ "w5500-ll",
 ]
 
 [[package]]

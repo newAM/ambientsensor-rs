@@ -11,6 +11,7 @@ embedded-hal = "~0.2.4"
 rtt-target = { version = "~0.3.0", features = ["cortex-m"] }
 cortex-m-rtic = "~0.5.5"
 eeprom25aa02e48 = "~0.1.0"
+dhcp = { path = "dhcp" }
 
 [dependencies.w5500-hl]
 version = "0.2.0"
@@ -25,3 +26,6 @@ features = ["stm32f070xb", "rt"]
 opt-level = "s"
 debug = 2
 debug-assertions = true
+
+[workspace]
+members = ["dhcp"]
