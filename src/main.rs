@@ -615,8 +615,10 @@ const APP: () = {
                         w5500.set_sipr(yiaddr).unwrap();
                         w5500.set_gar(&gateway).unwrap();
                         *dhcp_state = DhcpState::Bound;
-                        *mqtt_state = MqttState::Init;
-                        cx.spawn.mqtt_client().unwrap();
+                        if matches!(dhcp_state, DhcpState::Requesting) {
+                            *mqtt_state = MqttState::Init;
+                            cx.spawn.mqtt_client().unwrap();
+                        }
                     }
                     MsgType::Nak => {
                         log!("NAK");
@@ -661,7 +663,7 @@ const APP: () = {
         log!("[MQTT] {:?}", mqtt_state);
         match mqtt_state {
             MqttState::Init => {
-                let mut sn_imr = SocketInterruptMask::default();
+                let mut sn_imr: SocketInterruptMask = SocketInterruptMask::default();
                 sn_imr.mask_sendok();
                 w5500.set_sn_imr(MQTT_SOCKET, sn_imr).unwrap();
                 w5500.tcp_connect(MQTT_SOCKET, 33650, &MQTT_SERVER).unwrap();
@@ -743,7 +745,7 @@ const APP: () = {
                 }
 
                 cx.schedule
-                    .mqtt_client(cx.scheduled + 4000u16.millis())
+                    .mqtt_client(cx.scheduled + 5000u16.millis())
                     .unwrap();
             }
         }
