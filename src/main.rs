@@ -88,7 +88,6 @@ macro_rules! log {
 macro_rules! log_always {
     ($msg:expr) => {
         writeln!(&mut Logger, $msg).ok();
-        log_byte(b'\n')
     };
     ($msg:expr, $($arg:tt)*) => {
         writeln!(&mut Logger, $msg, $($arg)*).ok();
@@ -614,11 +613,11 @@ const APP: () = {
                         w5500.set_subr(&subnet_mask).unwrap();
                         w5500.set_sipr(yiaddr).unwrap();
                         w5500.set_gar(&gateway).unwrap();
-                        *dhcp_state = DhcpState::Bound;
                         if matches!(dhcp_state, DhcpState::Requesting) {
                             *mqtt_state = MqttState::Init;
                             cx.spawn.mqtt_client().unwrap();
                         }
+                        *dhcp_state = DhcpState::Bound;
                     }
                     MsgType::Nak => {
                         log!("NAK");
