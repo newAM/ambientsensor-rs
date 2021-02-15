@@ -345,7 +345,7 @@ const APP: () = {
 
         // enable DHCP & MQTT socket interrupts
         w5500
-            .set_simr((1 << u8::from(DHCP_SOCKET)) | (1 << u8::from(MQTT_SOCKET)))
+            .set_simr(DHCP_SOCKET.bitmask() | MQTT_SOCKET.bitmask())
             .unwrap();
 
         // start the DHCP task
