@@ -27,6 +27,7 @@ use stm32f0xx_hal::{
     prelude::*,
     serial::Serial,
     spi::{self, Spi},
+    stm32f0::stm32f0x0::Peripherals,
 };
 
 use w5500_hl::ll::{
@@ -47,18 +48,12 @@ const TEMPERATURE_TOPIC: &str = "/home/ambient1/temperature";
 const HUMIDITY_TOPIC: &str = "/home/ambient1/humidity";
 const PRESSURE_TOPIC: &str = "/home/ambient1/pressure";
 
-// this is very inefficient logging, but it is only used for assertions.
+// This is very inefficient logging, but that is OK because this is only used
+// for assertions in release mode (which should never occur).
 pub fn log_byte(byte: u8) {
-    const USART1_BASE: u32 = 0x4001_3800;
-
-    loop {
-        let isr = unsafe { core::ptr::read_volatile((USART1_BASE + 0x1C) as *mut u32) };
-        if (isr & (1 << 7)) != 0 {
-            break;
-        }
-    }
-
-    unsafe { core::ptr::write_volatile((USART1_BASE + 0x28) as *mut u32, u32::from(byte)) };
+    let dp: Peripherals = unsafe { Peripherals::steal() };
+    while dp.USART1.isr.read().txe().bit_is_clear() {}
+    unsafe { dp.USART1.tdr.write(|w| w.tdr().bits(byte as u16)) };
 }
 
 struct Logger;
