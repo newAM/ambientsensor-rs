@@ -47,5 +47,10 @@ After you have that target available you can build, the default target is alread
 cargo build
 ```
 
+Release builds require an additional feature flag to disable logging:
+```bash
+cargo build --release --features release
+```
+
 [rustup]: https://rustup.rs/
 [AmbientSensor]: https://github.com/newam/ambientsensor
