@@ -270,17 +270,16 @@ const APP: () = {
         // get the MAC address from the EEPROM
         // the Microchip 25aa02e48 EEPROM comes pre-programmed with a valid MAC
         // TODO: investigate why this fails
-        let mut mac: Eui48Addr = Eui48Addr::UNSPECIFIED;
         const BAD_MAC: Eui48Addr = Eui48Addr::new(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
-        loop {
-            eeprom.read_eui48(&mut mac.octets).unwrap();
+        let mac: Eui48Addr = loop {
+            let mac: Eui48Addr = eeprom.read_eui48().unwrap().into();
             if mac == Eui48Addr::UNSPECIFIED || mac == BAD_MAC {
                 log!("Failed to read the MAC address: {}", mac);
                 nop_delay_ms(10);
             } else {
-                break;
+                break mac;
             }
-        }
+        };
         debug_assert_eq!(mac.octets[0], 0x54);
         log!("MAC: {}", mac);
 
