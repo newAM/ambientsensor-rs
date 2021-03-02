@@ -404,9 +404,9 @@ dependencies = [
 
 [[package]]
 name = "w5500-hl"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61be1b01ba8efa89f02ba31b95eb1a5a77c810c8783adc3782e40cdbea598859"
+checksum = "d4dc960f663048c4a4faf46783ed9d0c6eb11440f871cc466c2729850acb0bad"
 dependencies = [
  "nb 1.0.0",
  "w5500-ll",
@@ -414,9 +414,9 @@ dependencies = [
 
 [[package]]
 name = "w5500-ll"
-version = "0.6.2"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0398d216f8d3976d9b72f6f9ff4270aa8056d38095fd875f5c0aea948444057a"
+checksum = "c03c4e8e1efc34bed5bb20e8b13da4043981e716f53a4ced53c848f20e3ee420"
 dependencies = [
  "embedded-hal",
 ]
