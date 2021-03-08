@@ -8,7 +8,7 @@ edition = "2018"
 release = []
 
 [dependencies]
-cortex-m = "~0.7.1"
+cortex-m = "~0.7.2"
 cortex-m-rt = "~0.6.13"
 embedded-hal = "~0.2.4"
 cortex-m-rtic = "~0.5.6"
