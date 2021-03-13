@@ -22,7 +22,11 @@ features = ["embedded-hal"]
 [dependencies.stm32f0xx-hal]
 git = "https://github.com/stm32-rs/stm32f0xx-hal.git"
 rev = "fba9834b59fa7567ffd604afed2bcd8d07c4e904"
-features = ["stm32f070xb", "rt"] 
+features = ["stm32f070xb", "rt"]
+
+[dependencies.bme280]
+git = "https://github.com/newAM/bme280-rs.git"
+rev = "ee0cac107f32e81bdf351bf983165ad95538083b"
 
 [profile.dev]
 opt-level = "s"

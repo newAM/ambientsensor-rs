@@ -2,15 +2,14 @@
 #![no_main]
 #![allow(clippy::type_complexity)]
 
-mod bme280;
 mod monotonic;
 mod mqtt;
 
-use bme280::BME280;
 use dhcp::{Dhcp, DhcpState, MsgType, DHCP_DESTINATION, DHCP_SOURCE_PORT};
 use monotonic::{Instant, Tim6Monotonic, U16Ext};
 use mqtt::{Connack, ConnectCode, CtrlPacket, Publish, CONNACK_LEN};
 
+use bme280::{Address, Bme280, Sample};
 use core::fmt::Write;
 use core::sync::atomic::{compiler_fence, Ordering::SeqCst};
 use embedded_hal::digital::v2::OutputPin;
@@ -47,6 +46,17 @@ const HOSTNAME: &str = "ambient1";
 const TEMPERATURE_TOPIC: &str = "/home/ambient1/temperature";
 const HUMIDITY_TOPIC: &str = "/home/ambient1/humidity";
 const PRESSURE_TOPIC: &str = "/home/ambient1/pressure";
+
+const BME280_SETTINGS: bme280::Settings = bme280::Settings {
+    config: bme280::Config::reset()
+        .set_standby_time(bme280::Standby::Millis125)
+        .set_filter(bme280::Filter::X8),
+    ctrl_meas: bme280::CtrlMeas::reset()
+        .set_osrs_t(bme280::Oversampling::X8)
+        .set_osrs_p(bme280::Oversampling::X8)
+        .set_mode(bme280::Mode::Normal),
+    ctrl_hum: bme280::Oversampling::X8,
+};
 
 // This is very inefficient logging, but that is OK because this is only used
 // for assertions in release mode (which should never occur).
@@ -205,7 +215,8 @@ const APP: () = {
         dhcp_lease: Option<u32>,
         yiaddr: Ipv4Addr,
         mqtt_state: MqttState,
-        bme280: BME280<I2c<I2C1, PB6<gpio::Alternate<AF1>>, PB7<gpio::Alternate<AF1>>>>,
+        bme280:
+            Bme280<I2c<I2C1, PB6<gpio::Alternate<AF1>>, PB7<gpio::Alternate<AF1>>>, bme280::Init>,
         xid: u32,
     }
 
@@ -261,7 +272,7 @@ const APP: () = {
         let i2c = I2c::i2c1(dp.I2C1, i2c1_pins, 100.khz(), &mut rcc);
         let mut serial = Serial::usart1(dp.USART1, uart_pins, 115_200.bps(), &mut rcc);
         let mut eeprom = eeprom25aa02e48::Eeprom25aa02e48::new(spi2, eepom_cs);
-        let mut bme280 = BME280::new(i2c);
+        let mut bme280 = Bme280::new(i2c, Address::SdoGnd);
         let mut w5500 = W5500::new(spi1, w5500_cs);
 
         writeln!(&mut serial, "Hello world!").ok();
@@ -287,7 +298,7 @@ const APP: () = {
 
         // sanity check temperature sensor
         assert_eq!(bme280.chip_id().unwrap(), bme280::CHIP_ID);
-        bme280.init().unwrap();
+        let bme280 = bme280.init(&BME280_SETTINGS).unwrap();
 
         // enable external interrupt for pb0 (W5500 interrupt)
         syscfg.exticr1.modify(|_, w| w.exti0().pb0());
@@ -646,7 +657,7 @@ const APP: () = {
         let w5500: &mut W5500<_, _> = cx.resources.w5500;
         let dhcp_state: &mut DhcpState = cx.resources.dhcp_state;
         let mqtt_state: &mut MqttState = cx.resources.mqtt_state;
-        let bme280: &mut BME280<_> = cx.resources.bme280;
+        let bme280: &mut Bme280<_, _> = cx.resources.bme280;
 
         if !dhcp_state.has_lease() {
             // we will be spawned when the DHCP client binds
@@ -706,7 +717,7 @@ const APP: () = {
                     .unwrap();
             }
             MqttState::Happy => {
-                let sample = bme280.sample().unwrap();
+                let sample: Sample = bme280.sample().unwrap();
                 log!("{:#?}", sample);
 
                 {
