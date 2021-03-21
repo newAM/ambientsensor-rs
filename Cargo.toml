@@ -26,7 +26,7 @@ features = ["stm32f070xb", "rt"]
 
 [dependencies.bme280]
 git = "https://github.com/newAM/bme280-rs.git"
-rev = "ee0cac107f32e81bdf351bf983165ad95538083b"
+rev = "2669ec67608522a56a066f0bf1596a81e72933d6"
 
 [profile.dev]
 opt-level = "s"
