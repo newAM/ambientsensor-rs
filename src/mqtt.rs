@@ -9,6 +9,7 @@ use core::fmt::Write;
 /// Control packet types.
 #[repr(u8)]
 #[allow(dead_code)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum CtrlPacket {
     CONNECT = 1,
     CONNACK = 2,
@@ -34,7 +35,7 @@ impl From<CtrlPacket> for u8 {
 
 /// Connection return codes.
 #[repr(u8)]
-#[allow(non_camel_case_types, dead_code)]
+#[allow(non_camel_case_types, dead_code, clippy::upper_case_acronyms)]
 pub enum ConnectCode {
     /// Connection Accepted
     ACCEPT = 0,

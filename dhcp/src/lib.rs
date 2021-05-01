@@ -124,6 +124,7 @@ impl From<DhcpOption> for u8 {
 ///
 /// From [RFC 2131 Section 2](https://tools.ietf.org/html/rfc2131#section-2)
 #[repr(u8)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum OpCode {
     BOOTREQUEST = 1,
     BOOTREPLY = 2,
