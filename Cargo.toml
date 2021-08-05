@@ -10,7 +10,7 @@ release = []
 [dependencies]
 cortex-m = "~0.7.3"
 cortex-m-rt = "~0.6.15"
-embedded-hal = "~0.2.5"
+embedded-hal = "~0.2.6"
 cortex-m-rtic = "~0.5.7"
 eeprom25aa02e48 = "~0.2"
 dhcp = { path = "dhcp" }
