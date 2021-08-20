@@ -136,9 +136,9 @@ dependencies = [
 
 [[package]]
 name = "cortex-m-rtic"
-version = "0.5.7"
+version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9845c4c7f7af19e216a2d00345f7f1507b8907b85cd551e403d68baeec342bb3"
+checksum = "5cc9d4655a80c8f63cb4cd52793301d0d79b4b935ddfc1deb789eb7cb8cbb3b4"
 dependencies = [
  "cortex-m 0.6.7",
  "cortex-m-rt",
