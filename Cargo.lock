@@ -136,12 +136,11 @@ dependencies = [
 
 [[package]]
 name = "cortex-m-rtic"
-version = "0.5.8"
+version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cc9d4655a80c8f63cb4cd52793301d0d79b4b935ddfc1deb789eb7cb8cbb3b4"
+checksum = "fb77bb72c171d0aa52a2954d8dc7e3f0800ab54b8df7d826f138abbea9eb2794"
 dependencies = [
  "cortex-m 0.6.7",
- "cortex-m-rt",
  "cortex-m-rtic-macros",
  "heapless",
  "rtic-core",
