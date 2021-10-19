@@ -16,7 +16,7 @@ eeprom25aa02e48 = "~0.2"
 dhcp = { path = "dhcp" }
 
 [dependencies.w5500-hl]
-version = "~0.4"
+version = "~0.5"
 features = ["embedded-hal"]
 
 [dependencies.stm32f0xx-hal]

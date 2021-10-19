@@ -457,9 +457,9 @@ dependencies = [
 
 [[package]]
 name = "w5500-hl"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d377c847fa7fd22e9fb926b04fc3f020e39c1763a8e3d9dc7ede4e19a353466f"
+checksum = "560b4054b84394ac5ad48b8d8ab41c41c43f0b7be6b3b8bd738a749982720854"
 dependencies = [
  "nb 1.0.0",
  "w5500-ll",
