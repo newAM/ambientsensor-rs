@@ -543,7 +543,7 @@ const APP: () = {
             );
             // TODO: handle buffer underrun
 
-            #[allow(clippy::if_same_then_else)]
+            #[allow(clippy::if_same_then_else, clippy::needless_bool)]
             if !dhcp_buf.is_bootreply() {
                 log!("not a bootreply");
                 true
