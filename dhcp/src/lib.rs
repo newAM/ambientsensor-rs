@@ -1,6 +1,5 @@
 #![no_std]
 
-use core::convert::{TryFrom, TryInto};
 use w5500_ll::net::{Eui48Addr, Ipv4Addr, SocketAddrV4};
 
 /// DHCP state.
@@ -177,7 +176,7 @@ pub struct Dhcp {
     ptr: &'static mut usize,
 }
 
-#[allow(clippy::clippy::len_without_is_empty)]
+#[allow(clippy::len_without_is_empty)]
 impl Dhcp {
     /// Grab the statically allocated DHCP buffer.
     ///

@@ -1,8 +1,10 @@
 on:
   push:
+    branches:
+      - main
   pull_request:
   schedule:
-    - cron: "13 3 * * *"
+    - cron: "13 3 * * 3"
 
 name: CI
 
@@ -10,49 +12,50 @@ jobs:
   build:
     name: Debug Compile Check
     runs-on: ubuntu-latest
+    env: {"RUSTFLAGS": "-D warnings"}
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1.0.7
         with:
           toolchain: stable
           target: thumbv6m-none-eabi
-      - run: RUSTFLAGS="-D warnings" cargo build --target thumbv6m-none-eabi
+      - run: cargo build --target thumbv6m-none-eabi
   
   build_release:
     name: Release Compile Check
     runs-on: ubuntu-latest
+    env: {"RUSTFLAGS": "-D warnings"}
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1.0.7
         with:
           toolchain: stable
           target: thumbv6m-none-eabi
-      - run: RUSTFLAGS="-D warnings" cargo build --target thumbv6m-none-eabi --release --features release
+      - run: cargo build --target thumbv6m-none-eabi --release --features release
 
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
+    env: {"RUSTFLAGS": "-D warnings"}
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1.0.7
         with:
           toolchain: stable
-      - run: RUSTFLAGS="-D warnings" cargo test -p dhcp --target x86_64-unknown-linux-gnu
+      - run: cargo test -p dhcp --target x86_64-unknown-linux-gnu
 
-  clippy_check:
+  clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1.0.7
+      - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           components: clippy
-          target: thumbv6m-none-eabi
-      - uses: actions-rs/clippy-check@v1.0.7
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --target thumbv6m-none-eabi
+      # not using clippy-check due to this issue:
+      # https://github.com/actions-rs/clippy-check/issues/2
+      - run: cargo clippy --all-features -- --deny warnings
 
   format_check:
     name: Rust Format
