@@ -543,6 +543,7 @@ const APP: () = {
             );
             // TODO: handle buffer underrun
 
+            #[allow(clippy::if_same_then_else)]
             if !dhcp_buf.is_bootreply() {
                 log!("not a bootreply");
                 true
@@ -684,6 +685,7 @@ const APP: () = {
                 let mut connack: Connack = Connack::new();
                 let rx_bytes: usize = w5500.tcp_read(MQTT_SOCKET, &mut connack.buf).unwrap();
                 // the server should only ever send us the CONNACK packet
+                #[allow(clippy::if_same_then_else)]
                 if rx_bytes != CONNACK_LEN {
                     log!(
                         "[MQTT] CONNACK buffer underrrun {}/{}",
