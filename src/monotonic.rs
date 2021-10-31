@@ -1,9 +1,5 @@
 use core::u32;
-use core::{
-    cmp::Ordering,
-    convert::{Infallible, TryInto},
-    fmt, ops,
-};
+use core::{cmp::Ordering, convert::Infallible, fmt, ops};
 use rtic::Monotonic;
 use stm32f0xx_hal::pac;
 
