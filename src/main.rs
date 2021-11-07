@@ -33,13 +33,13 @@ use w5500_hl::ll::{
     blocking::vdm::W5500,
     net::{Eui48Addr, Ipv4Addr, SocketAddrV4},
     spi::MODE as W5500_MODE,
-    LinkStatus, OperationMode, PhyCfg, Registers, Socket, SocketInterrupt, SocketInterruptMask,
+    LinkStatus, OperationMode, PhyCfg, Registers, Sn, SocketInterrupt, SocketInterruptMask,
     SOCKETS,
 };
 use w5500_hl::{Tcp, Udp};
 
-const DHCP_SOCKET: Socket = Socket::Socket0;
-const MQTT_SOCKET: Socket = Socket::Socket1;
+const DHCP_SOCKET: Sn = Sn::Sn0;
+const MQTT_SOCKET: Sn = Sn::Sn1;
 
 const MQTT_SERVER: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(10, 0, 0, 4), 1883);
 const HOSTNAME: &str = "ambient1";
@@ -325,9 +325,8 @@ const APP: () = {
             // wait for the PHY to indicate the Ethernet link is up
             let mut attempts: usize = 0;
             log!("Polling for link up");
-            let mut phy_cfg: PhyCfg = PhyCfg::default();
-            phy_cfg.set_opmdc(OperationMode::FullDuplex10bt);
-            w5500.set_phycfgr(phy_cfg).unwrap();
+            const PHY_CFG: PhyCfg = PhyCfg::DEFAULT.set_opmdc(OperationMode::FullDuplex10bt);
+            w5500.set_phycfgr(PHY_CFG).unwrap();
 
             const LINK_UP_POLL_PERIOD_MILLIS: usize = 100;
             const LINK_UP_POLL_ATTEMPTS: usize = 50;
@@ -390,6 +389,7 @@ const APP: () = {
             compiler_fence(SeqCst);
         }
     }
+    // eth.addr == 54:10:EC:22:3A:20
 
     /// This is the W5500 interrupt.
     ///
@@ -402,14 +402,17 @@ const APP: () = {
         let mqtt_state: &mut MqttState = cx.resources.mqtt_state;
 
         let mut sir: u8 = w5500.sir().unwrap();
-        debug_assert_ne!(sir, 0x00);
+        // may occur when there are power supply issues
+        if sir == 0 {
+            log_always!("[ERROR] spurious interrupt");
+        }
 
-        for socket in SOCKETS.iter() {
-            let mask: u8 = 1 << (*socket as u8);
+        for sn in SOCKETS.iter() {
+            let mask: u8 = 1 << (*sn as u8);
             if sir & mask != 0 {
-                let sn_ir: SocketInterrupt = w5500.sn_ir(*socket).unwrap();
-                w5500.set_sn_ir(*socket, sn_ir).unwrap();
-                match *socket {
+                let sn_ir: SocketInterrupt = w5500.sn_ir(*sn).unwrap();
+                w5500.set_sn_ir(*sn, sn_ir).unwrap();
+                match *sn {
                     DHCP_SOCKET => {
                         if sn_ir.con_raised() {
                             log!("[DHCP] INTERRUPT CON");
@@ -449,7 +452,10 @@ const APP: () = {
                             }
                         }
                     }
-                    _ => unreachable!("{:?}", socket),
+                    _ => {
+                        // may occur when there are power supply issues
+                        log_always!("[ERROR] unhandled socket {:?}", *sn);
+                    }
                 }
                 sir &= !mask;
             }
@@ -668,9 +674,8 @@ const APP: () = {
         log!("[MQTT] {:?}", mqtt_state);
         match mqtt_state {
             MqttState::Init => {
-                let mut sn_imr: SocketInterruptMask = SocketInterruptMask::default();
-                sn_imr.mask_sendok();
-                w5500.set_sn_imr(MQTT_SOCKET, sn_imr).unwrap();
+                const SN_IMR: SocketInterruptMask = SocketInterruptMask::DEFAULT.mask_sendok();
+                w5500.set_sn_imr(MQTT_SOCKET, SN_IMR).unwrap();
                 w5500.tcp_connect(MQTT_SOCKET, 33650, &MQTT_SERVER).unwrap();
 
                 // we will be spawned by socket interrupt
