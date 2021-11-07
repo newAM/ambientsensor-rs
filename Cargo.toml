@@ -1,22 +1,22 @@
 [package]
 name = "ambientsensor"
 version = "0.1.0"
-authors = ["Alex M. <alexmgit@protonmail.com>"]
+authors = ["Alex Martens <alexmgit@protonmail.com>"]
 edition = "2021"
 
 [features]
 release = []
 
 [dependencies]
-cortex-m = "~0.7.3"
-cortex-m-rt = "~0.6.15"
-embedded-hal = "~0.2.6"
-cortex-m-rtic = "~0.5.8"
-eeprom25aa02e48 = "~0.2"
+cortex-m = "0.7.3"
+cortex-m-rt = "0.6.15"
+embedded-hal = "0.2.6"
+cortex-m-rtic = "0.5.8"
+eeprom25aa02e48 = "0.2"
 dhcp = { path = "dhcp" }
 
 [dependencies.w5500-hl]
-version = "~0.5"
+version = "0.6"
 features = ["embedded-hal"]
 
 [dependencies.stm32f0xx-hal]

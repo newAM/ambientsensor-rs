@@ -9,7 +9,3 @@ speed = 1800
 [default.rtt]
 enabled = false
 log_enabled = true
-
-[default.gdb]
-enable = true
-gdb_connection_string = "127.0.0.1:3333"
