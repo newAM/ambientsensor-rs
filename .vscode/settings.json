@@ -1,0 +1,9 @@
+{
+    "rust-analyzer.cargo.features": [],
+    "rust-analyzer.cargo.allFeatures": false,
+    "rust-analyzer.checkOnSave.features": [],
+    "rust-analyzer.checkOnSave.allFeatures": false,
+    "rust-analyzer.checkOnSave.allTargets": false,
+    "rust-analyzer.cargo.target": "thumbv6m-none-eabi",
+    "rust-analyzer.procMacro.enable": false,
+}
