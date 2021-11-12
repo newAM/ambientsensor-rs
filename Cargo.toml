@@ -17,7 +17,7 @@ dhcp = { path = "dhcp" }
 systick-monotonic = "0.1.0-rc.2"
 
 [dependencies.w5500-hl]
-version = "0.6"
+version = "0.7"
 features = ["embedded-hal"]
 
 [dependencies.stm32f0xx-hal]
