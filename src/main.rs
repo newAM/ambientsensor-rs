@@ -11,7 +11,6 @@ use bme280::{Address, Bme280, Sample};
 use core::fmt::Write;
 use core::sync::atomic::{compiler_fence, Ordering::SeqCst};
 use embedded_hal::digital::v2::OutputPin;
-use rtic::time::duration::Extensions;
 use stm32f0xx_hal::{
     gpio::{
         self,
@@ -26,7 +25,7 @@ use stm32f0xx_hal::{
     spi::{self, Spi},
     stm32f0::stm32f0x0::Peripherals,
 };
-use systick_monotonic::Systick;
+use systick_monotonic::{ExtU64, Systick};
 use w5500_hl::ll::{
     blocking::vdm::W5500,
     net::{Eui48Addr, Ipv4Addr, SocketAddrV4},
@@ -525,7 +524,7 @@ mod app {
                     dhcp_fsm::spawn().unwrap();
                 }
 
-                second_ticker::spawn_after(1.seconds()).unwrap();
+                second_ticker::spawn_after(1.secs()).unwrap();
             });
     }
 
@@ -793,7 +792,7 @@ mod app {
                             assert_eq!(tx_bytes, publish.as_slice().len());
                         }
 
-                        mqtt_client::spawn_after(5.seconds()).unwrap();
+                        mqtt_client::spawn_after(5.secs()).unwrap();
                     }
                 }
             },
