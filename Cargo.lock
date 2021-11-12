@@ -171,7 +171,7 @@ dependencies = [
  "bare-metal 1.0.0",
  "cortex-m",
  "cortex-m-rtic-macros",
- "heapless 0.7.7",
+ "heapless 0.7.8",
  "rtic-core",
  "rtic-monotonic",
  "version_check",
@@ -338,9 +338,9 @@ dependencies = [
 
 [[package]]
 name = "heapless"
-version = "0.7.7"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe65ef062f1af5b1b189842b0bc45bd671c38e1d22c6aa22e6ada03d01026d53"
+checksum = "9c1ad878e07405df82b695089e63d278244344f80e764074d0bdfe99b89460f3"
 dependencies = [
  "atomic-polyfill",
  "hash32 0.2.1",
@@ -681,9 +681,9 @@ dependencies = [
 
 [[package]]
 name = "w5500-hl"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "516810fd125cce903836f12d3ca07bdea2240f3a29baedb83d57c511e7e1c617"
+checksum = "2478ba11df72e36a03783e6cc72eb3a0ea5ad065810ff37f5b298f3389eff82d"
 dependencies = [
  "nb 1.0.0",
  "w5500-ll",
@@ -691,9 +691,9 @@ dependencies = [
 
 [[package]]
 name = "w5500-ll"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a729fc36dee391d9767c252e19bdcaa2405d06cf36cbcdd51af97f916c15584"
+checksum = "2c752ee430df69eadc93b3022db5830d43824275dfe8fa36eba35556adfe41ad"
 dependencies = [
  "embedded-hal",
 ]

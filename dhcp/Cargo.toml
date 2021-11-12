@@ -5,4 +5,4 @@ authors = ["Alex Martens <alexmgit@protonmail.com>"]
 edition = "2021"
 
 [dependencies]
-w5500-ll = "0.9"
+w5500-ll = "0.10"
