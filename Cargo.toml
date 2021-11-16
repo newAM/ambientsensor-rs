@@ -21,8 +21,7 @@ version = "0.7"
 features = ["embedded-hal"]
 
 [dependencies.stm32f0xx-hal]
-git = "https://github.com/stm32-rs/stm32f0xx-hal.git"
-rev = "c4858d3bf0792a5b7a60445ca01fd556d101ecc1"
+version = "0.18"
 features = ["stm32f070xb", "rt"]
 
 [dependencies.bme280]
