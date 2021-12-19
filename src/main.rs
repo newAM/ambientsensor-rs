@@ -228,6 +228,11 @@ mod app {
 
     #[init]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
+        // symptom of a version mismatch when using the RTIC alpha
+        // see: https://github.com/rust-embedded/cortex-m/pull/350
+        // replace with `cx.cs` when cortex-m gets updated
+        let cs = unsafe { &cortex_m::interrupt::CriticalSection::new() };
+
         let mut dp = cx.device;
         let mut rcc = {
             let rcc = dp.RCC;
@@ -242,41 +247,36 @@ mod app {
         let systick = cx.core.SYST;
         let mono = Systick::new(systick, SYSCLK_HZ);
 
-        // hardware declaration
-        let ((eepom_cs, w5500_cs, mut w5500_rst), spi1_pins, spi2_pins, i2c1_pins, uart_pins) =
-            cortex_m::interrupt::free(move |cs| {
-                gpiob.pb0.into_pull_down_input(cs); // INT
-                (
-                    (
-                        gpiob.pb12.into_push_pull_output(cs), // EEPROM CS
-                        gpioa.pa4.into_push_pull_output(cs),  // W5500 CS
-                        gpioa.pa3.into_push_pull_output(cs),  // W5500 RST
-                    ),
-                    (
-                        gpioa.pa5.into_alternate_af0(cs), // W5500 SCK
-                        gpioa.pa6.into_alternate_af0(cs), // W5500 MISO
-                        gpioa.pa7.into_alternate_af0(cs), // W5500 MOSI
-                    ),
-                    (
-                        gpiob.pb13.into_alternate_af0(cs), // EEPROM SCK
-                        gpiob.pb14.into_alternate_af0(cs), // EEPROM MISO
-                        gpiob.pb15.into_alternate_af0(cs), // EEPROM MOSI
-                    ),
-                    (
-                        gpiob.pb6.into_alternate_af1(cs), // I2C SCL
-                        gpiob.pb7.into_alternate_af1(cs), // I2C SDA
-                    ),
-                    (
-                        gpioa.pa9.into_alternate_af1(cs),  // UART TX
-                        gpioa.pa10.into_alternate_af1(cs), // UART RX
-                    ),
-                )
-            });
+        gpiob.pb0.into_pull_down_input(cs); // INT
+
+        let eeprom_cs = gpiob.pb12.into_push_pull_output(cs);
+        let w5500_cs = gpioa.pa4.into_push_pull_output(cs);
+        let mut w5500_rst = gpioa.pa3.into_push_pull_output(cs);
+
+        let spi1_pins = (
+            gpioa.pa5.into_alternate_af0(cs), // W5500 SCK
+            gpioa.pa6.into_alternate_af0(cs), // W5500 MISO
+            gpioa.pa7.into_alternate_af0(cs), // W5500 MOSI
+        );
+        let spi2_pins = (
+            gpiob.pb13.into_alternate_af0(cs), // EEPROM SCK
+            gpiob.pb14.into_alternate_af0(cs), // EEPROM MISO
+            gpiob.pb15.into_alternate_af0(cs), // EEPROM MOSI
+        );
+        let i2c1_pins = (
+            gpiob.pb6.into_alternate_af1(cs), // I2C SCL
+            gpiob.pb7.into_alternate_af1(cs), // I2C SDA
+        );
+        let uart_pins = (
+            gpioa.pa9.into_alternate_af1(cs),  // UART TX
+            gpioa.pa10.into_alternate_af1(cs), // UART RX
+        );
+
         let spi1 = Spi::spi1(dp.SPI1, spi1_pins, W5500_MODE, 1.mhz(), &mut rcc);
         let spi2 = Spi::spi2(dp.SPI2, spi2_pins, W5500_MODE, 1.mhz(), &mut rcc);
         let i2c = I2c::i2c1(dp.I2C1, i2c1_pins, 100.khz(), &mut rcc);
         let mut serial = Serial::usart1(dp.USART1, uart_pins, 115_200.bps(), &mut rcc);
-        let mut eeprom = eeprom25aa02e48::Eeprom25aa02e48::new(spi2, eepom_cs);
+        let mut eeprom = eeprom25aa02e48::Eeprom25aa02e48::new(spi2, eeprom_cs);
         let mut bme280 = Bme280::new(i2c, Address::SdoGnd);
         let mut w5500 = W5500::new(spi1, w5500_cs);
 
