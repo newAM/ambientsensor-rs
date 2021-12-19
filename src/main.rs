@@ -159,26 +159,27 @@ pub enum MqttState {
     Happy,
 }
 
-pub struct NopDelay;
+const SYSCLK_HZ: u32 = 8_000_000;
 
-impl Default for NopDelay {
-    fn default() -> NopDelay {
-        NopDelay
+pub struct CycleDelay;
+
+impl Default for CycleDelay {
+    fn default() -> CycleDelay {
+        CycleDelay
     }
 }
 
-impl embedded_hal::blocking::delay::DelayMs<u8> for NopDelay {
+impl embedded_hal::blocking::delay::DelayMs<u8> for CycleDelay {
     fn delay_ms(&mut self, ms: u8) {
-        nop_delay_ms(ms.into())
+        delay_ms(ms.into())
     }
 }
 
 /// Worlds worst delay function.
 #[inline(always)]
-pub fn nop_delay_ms(ms: usize) {
-    for _ in 0..(727 * ms) {
-        cortex_m::asm::nop();
-    }
+pub fn delay_ms(ms: u32) {
+    const CYCLES_PER_MILLIS: u32 = SYSCLK_HZ / 1000;
+    cortex_m::asm::delay(CYCLES_PER_MILLIS.saturating_mul(ms));
 }
 
 #[rtic::app(
@@ -239,7 +240,7 @@ mod app {
         let exti: EXTI = dp.EXTI;
 
         let systick = cx.core.SYST;
-        let mono = Systick::new(systick, 8_000_000);
+        let mono = Systick::new(systick, SYSCLK_HZ);
 
         // hardware declaration
         let ((eepom_cs, w5500_cs, mut w5500_rst), spi1_pins, spi2_pins, i2c1_pins, uart_pins) =
@@ -290,7 +291,7 @@ mod app {
             let mac: Eui48Addr = eeprom.read_eui48().unwrap().into();
             if mac == Eui48Addr::UNSPECIFIED || mac == BAD_MAC {
                 log!("Failed to read the MAC address: {}", mac);
-                nop_delay_ms(10);
+                delay_ms(10);
             } else {
                 break mac;
             }
@@ -298,7 +299,7 @@ mod app {
         debug_assert_eq!(mac.octets[0], 0x54);
         log!("MAC: {}", mac);
 
-        w5500_hl::ll::reset(&mut w5500_rst, &mut NopDelay::default()).unwrap();
+        w5500_hl::ll::reset(&mut w5500_rst, &mut CycleDelay::default()).unwrap();
 
         // sanity check temperature sensor
         assert_eq!(bme280.chip_id().unwrap(), bme280::CHIP_ID);
@@ -327,13 +328,13 @@ mod app {
             debug_assert_eq!(w5500.shar().unwrap(), mac);
 
             // wait for the PHY to indicate the Ethernet link is up
-            let mut attempts: usize = 0;
+            let mut attempts: u32 = 0;
             log!("Polling for link up");
             const PHY_CFG: PhyCfg = PhyCfg::DEFAULT.set_opmdc(OperationMode::FullDuplex10bt);
             w5500.set_phycfgr(PHY_CFG).unwrap();
 
-            const LINK_UP_POLL_PERIOD_MILLIS: usize = 100;
-            const LINK_UP_POLL_ATTEMPTS: usize = 50;
+            const LINK_UP_POLL_PERIOD_MILLIS: u32 = 100;
+            const LINK_UP_POLL_ATTEMPTS: u32 = 50;
             loop {
                 let phy_cfg: PhyCfg = w5500.phycfgr().unwrap();
                 if phy_cfg.lnk() == LinkStatus::Up {
@@ -346,14 +347,14 @@ mod app {
                     );
                     break;
                 }
-                nop_delay_ms(LINK_UP_POLL_PERIOD_MILLIS);
+                delay_ms(LINK_UP_POLL_PERIOD_MILLIS);
                 attempts += 1;
             }
 
             w5500_rst.set_low().unwrap();
-            nop_delay_ms(1);
+            delay_ms(1);
             w5500_rst.set_high().unwrap();
-            nop_delay_ms(3);
+            delay_ms(3);
         };
         log!("Done link up\n{}", _phy_cfg);
 
