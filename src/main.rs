@@ -2,10 +2,10 @@
 #![no_main]
 #![allow(clippy::type_complexity)]
 
-mod mqtt;
-
 use dhcp::{Dhcp, DhcpState, MsgType, DHCP_DESTINATION, DHCP_SOURCE_PORT};
-use mqtt::{Connack, ConnectCode, CtrlPacket, Publish, CONNACK_LEN};
+use mqtt::v3::{
+    ConnackResult, Connect, ConnectCode, Publish, PublishBuilder, QoS, CONNACK_LEN,
+};
 
 use bme280::{Address, Bme280, Sample};
 use core::fmt::Write;
@@ -40,9 +40,18 @@ const MQTT_SOCKET: Sn = Sn::Sn1;
 
 const MQTT_SERVER: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(10, 0, 0, 4), 1883);
 const HOSTNAME: &str = "ambient1";
-const TEMPERATURE_TOPIC: &str = "/home/ambient1/temperature";
-const HUMIDITY_TOPIC: &str = "/home/ambient1/humidity";
-const PRESSURE_TOPIC: &str = "/home/ambient1/pressure";
+const TEMPERATURE_PUBLISH: Publish<32> = PublishBuilder::new()
+    .set_qos(QoS::AtMostOnce)
+    .set_topic("/home/ambient1/temperature")
+    .finalize();
+const HUMIDITY_PUBLISH: Publish<32> = PublishBuilder::new()
+    .set_qos(QoS::AtMostOnce)
+    .set_topic("/home/ambient1/humidity")
+    .finalize();
+const PRESSURE_PUBLISH: Publish<32> = PublishBuilder::new()
+    .set_qos(QoS::AtMostOnce)
+    .set_topic("/home/ambient1/pressure")
+    .finalize();
 
 const BME280_SETTINGS: bme280::Settings = bme280::Settings {
     config: bme280::Config::reset()
@@ -717,43 +726,32 @@ mod app {
                         // we will be spawned by socket interrupt
                     }
                     MqttState::ConInt => {
-                        let tx_bytes: usize = w5500.tcp_write(MQTT_SOCKET, &mqtt::CONNECT).unwrap();
-                        assert_eq!(tx_bytes, mqtt::CONNECT.len());
+                        let tx_bytes: usize = w5500
+                            .tcp_write(MQTT_SOCKET, &Connect::DEFAULT.into_array())
+                            .unwrap();
+                        assert_eq!(tx_bytes, Connect::LEN);
 
                         // we will be spawned by socket interrupt
                     }
                     MqttState::RecvInt => {
-                        let mut connack: Connack = Connack::new();
-                        let rx_bytes: usize =
-                            w5500.tcp_read(MQTT_SOCKET, &mut connack.buf).unwrap();
-                        // the server should only ever send us the CONNACK packet
-                        #[allow(clippy::if_same_then_else)]
-                        if rx_bytes != CONNACK_LEN {
-                            log!(
-                                "[MQTT] CONNACK buffer underrrun {}/{}",
-                                rx_bytes,
-                                CONNACK_LEN
-                            );
-                            *mqtt_state = MqttState::Init;
-                        } else if connack.ctrl_pkt_type() != CtrlPacket::CONNACK.into() {
-                            log!(
-                                "[MQTT] Excepted a CONNACK byte (0x{:02X}), found byte 0x{:02X}",
-                                u8::from(CtrlPacket::CONNACK),
-                                connack.ctrl_pkt_type()
-                            );
-                            *mqtt_state = MqttState::Init;
-                        } else if connack.remaining_len() != 2 {
-                            log!(
-                                "[MQTT] CONNACK remaining length is unexpected: {} (expected 2)",
-                                connack.remaining_len()
-                            );
-                            *mqtt_state = MqttState::Init;
-                        } else if connack.rc() == ConnectCode::ACCEPT.into() {
-                            log!("[MQTT] CONNACK");
-                            *mqtt_state = MqttState::Happy;
-                        } else {
-                            log!("[MQTT] Unexpected CONNACK code: 0x{:02X}", connack.rc());
-                            *mqtt_state = MqttState::Init;
+                        let mut buf: [u8; CONNACK_LEN] = [0; CONNACK_LEN];
+                        let rx_bytes: usize = w5500.tcp_read(MQTT_SOCKET, &mut buf).unwrap();
+
+                        match ConnackResult::from_buf(&buf[..rx_bytes]) {
+                            Ok(connack) => {
+                                let code: ConnectCode = connack.code();
+                                log!("[MQTT] CONNACK: {:?}", code);
+
+                                if connack.code() == ConnectCode::Accept {
+                                    *mqtt_state = MqttState::Happy;
+                                } else {
+                                    *mqtt_state = MqttState::Init;
+                                }
+                            }
+                            Err(e) => {
+                                log!("[MQTT] {:?}", e);
+                                *mqtt_state = MqttState::Init;
+                            }
                         }
 
                         mqtt_client::spawn().unwrap();
@@ -763,31 +761,22 @@ mod app {
                         log!("{:#?}", sample);
 
                         {
-                            let mut publish: Publish = Publish::new();
-                            publish.set_topic(TEMPERATURE_TOPIC);
-                            publish
-                                .write_fmt(format_args!("{:.1}", sample.temperature))
-                                .unwrap();
+                            let mut publish = TEMPERATURE_PUBLISH;
+                            write!(&mut publish, "{:.1}", sample.temperature).unwrap();
                             let tx_bytes: usize =
                                 w5500.tcp_write(MQTT_SOCKET, publish.as_slice()).unwrap();
                             assert_eq!(tx_bytes, publish.as_slice().len());
                         }
                         {
-                            let mut publish: Publish = Publish::new();
-                            publish.set_topic(PRESSURE_TOPIC);
-                            publish
-                                .write_fmt(format_args!("{}", sample.pressure as i32))
-                                .unwrap();
+                            let mut publish = PRESSURE_PUBLISH;
+                            write!(&mut publish, "{}", sample.pressure as i32).unwrap();
                             let tx_bytes: usize =
                                 w5500.tcp_write(MQTT_SOCKET, publish.as_slice()).unwrap();
                             assert_eq!(tx_bytes, publish.as_slice().len());
                         }
                         {
-                            let mut publish: Publish = Publish::new();
-                            publish.set_topic(HUMIDITY_TOPIC);
-                            publish
-                                .write_fmt(format_args!("{:.1}", sample.humidity))
-                                .unwrap();
+                            let mut publish = HUMIDITY_PUBLISH;
+                            write!(&mut publish, "{:.1}", sample.humidity).unwrap();
                             let tx_bytes: usize =
                                 w5500.tcp_write(MQTT_SOCKET, publish.as_slice()).unwrap();
                             assert_eq!(tx_bytes, publish.as_slice().len());

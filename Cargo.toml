@@ -28,6 +28,11 @@ features = ["stm32f070xb", "rt"]
 git = "https://github.com/newAM/bme280-rs.git"
 rev = "2669ec67608522a56a066f0bf1596a81e72933d6"
 
+[dependencies.mqtt]
+package = "newam-mqtt"
+git = "https://github.com/newAM/newam-mqtt.git"
+rev = "d34c37d6fc7bf44a6ace4e4efffa35c95c235156"
+
 [profile.dev]
 opt-level = "s"
 debug = 2

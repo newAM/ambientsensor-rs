@@ -35,6 +35,7 @@ There is not a lot of commentary I can offer about embedded rust that has not al
 * [w5500-ll](https://github.com/newAM/w5500-ll-rs) - Low level W5500 Ethernet chip driver
 * [w5500-hl](https://github.com/newAM/w5500-hl-rs) - Higher level W5500 Ethernet chip driver
 * [bme280](https://github.com/newAM/bme280-rs) - Bosch BME280 driver
+* [newam-mqtt](https://github.com/newAM/newam-mqtt) - MQTT packet serialization and deserialization
 
 ## Building
 You will need [rustup] and the `thumbv6m-none-eabi` target.
