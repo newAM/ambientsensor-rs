@@ -742,14 +742,14 @@ mod app {
                                 let code: ConnectCode = connack.code();
                                 log!("[MQTT] CONNACK: {:?}", code);
 
-                                if connack.code() == ConnectCode::Accept {
+                                if code == ConnectCode::Accept {
                                     *mqtt_state = MqttState::Happy;
                                 } else {
                                     *mqtt_state = MqttState::Init;
                                 }
                             }
-                            Err(e) => {
-                                log!("[MQTT] {:?}", e);
+                            Err(_e) => {
+                                log!("[MQTT] {:?}", _e);
                                 *mqtt_state = MqttState::Init;
                             }
                         }
