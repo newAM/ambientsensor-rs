@@ -22,6 +22,7 @@ dependencies = [
  "dhcp",
  "eeprom25aa02e48",
  "embedded-hal",
+ "newam-mqtt",
  "stm32f0xx-hal",
  "systick-monotonic",
  "w5500-hl",
@@ -292,6 +293,11 @@ name = "nb"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
+
+[[package]]
+name = "newam-mqtt"
+version = "0.1.0"
+source = "git+https://github.com/newAM/newam-mqtt.git?rev=d34c37d6fc7bf44a6ace4e4efffa35c95c235156#d34c37d6fc7bf44a6ace4e4efffa35c95c235156"
 
 [[package]]
 name = "proc-macro-error"
