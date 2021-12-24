@@ -3,9 +3,7 @@
 #![allow(clippy::type_complexity)]
 
 use dhcp::{Dhcp, DhcpState, MsgType, DHCP_DESTINATION, DHCP_SOURCE_PORT};
-use mqtt::v3::{
-    ConnackResult, Connect, ConnectCode, Publish, PublishBuilder, QoS, CONNACK_LEN,
-};
+use mqtt::v3::{ConnackResult, Connect, ConnectCode, Publish, PublishBuilder, QoS, CONNACK_LEN};
 
 use bme280::{Address, Bme280, Sample};
 use core::fmt::Write;
