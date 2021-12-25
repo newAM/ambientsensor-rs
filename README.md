@@ -34,7 +34,7 @@ There is not a lot of commentary I can offer about embedded rust that has not al
 * [eeprom25aa02e48](https://github.com/newAM/eeprom25aa02e48-rs) - EEPROM driver, my first rust crate
 * [w5500-ll](https://github.com/newAM/w5500-ll-rs) - Low level W5500 Ethernet chip driver
 * [w5500-hl](https://github.com/newAM/w5500-hl-rs) - Higher level W5500 Ethernet chip driver
-* [w5500-dhcp](https://github.com/newAM/w5500-dhcp) - Simple W5500 DHCP client
+* [w5500-dhcp](https://github.com/newAM/w5500-dhcp-rs) - Simple W5500 DHCP client
 * [bme280](https://github.com/newAM/bme280-rs) - Bosch BME280 driver
 * [newam-mqtt](https://github.com/newAM/newam-mqtt) - MQTT packet serialization and deserialization
 
