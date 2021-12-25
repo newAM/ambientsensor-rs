@@ -10,7 +10,6 @@ This is still a work in progress.
 
 1. The OPT3002 luminosity sensor is not implemented.
 2. The panic handler needs to get hooked up to the EEPROM to store error logs then reset.
-3. Unit tests for DHCP/MQTT.
 
 ## Purpose
 
@@ -39,6 +38,7 @@ There is not a lot of commentary I can offer about embedded rust that has not al
 * [newam-mqtt](https://github.com/newAM/newam-mqtt) - MQTT packet serialization and deserialization
 
 ## Building
+
 You will need [rustup] and the `thumbv6m-none-eabi` target.
 
 ```bash
