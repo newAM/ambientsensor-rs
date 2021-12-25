@@ -31,7 +31,7 @@ jobs:
         with:
           toolchain: stable
           target: thumbv6m-none-eabi
-      - run: cargo build --target thumbv6m-none-eabi --release --features release
+      - run: cargo build --target thumbv6m-none-eabi --release
 
   test:
     name: Unit Tests

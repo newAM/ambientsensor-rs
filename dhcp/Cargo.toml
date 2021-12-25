@@ -1,8 +1,0 @@
-[package]
-name = "dhcp"
-version = "0.1.0"
-authors = ["Alex Martens <alexmgit@protonmail.com>"]
-edition = "2021"
-
-[dependencies]
-w5500-ll = "0.10"
