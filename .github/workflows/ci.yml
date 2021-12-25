@@ -33,17 +33,6 @@ jobs:
           target: thumbv6m-none-eabi
       - run: cargo build --target thumbv6m-none-eabi --release
 
-  test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    env: {"RUSTFLAGS": "-D warnings"}
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1.0.7
-        with:
-          toolchain: stable
-      - run: cargo test -p dhcp --target x86_64-unknown-linux-gnu
-
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
