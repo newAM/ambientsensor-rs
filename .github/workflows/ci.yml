@@ -46,8 +46,8 @@ jobs:
       # https://github.com/actions-rs/clippy-check/issues/2
       - run: cargo clippy --all-features -- --deny warnings
 
-  format_check:
-    name: Rust Format
+  format:
+    name: Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
