@@ -15,17 +15,18 @@ dependencies = [
 name = "ambientsensor"
 version = "0.1.0"
 dependencies = [
+ "atomic-polyfill",
  "bme280",
  "cortex-m",
  "cortex-m-rt",
  "cortex-m-rtic",
- "dhcp",
  "eeprom25aa02e48",
  "embedded-hal",
+ "log",
  "newam-mqtt",
  "stm32f0xx-hal",
  "systick-monotonic",
- "w5500-hl",
+ "w5500-dhcp",
 ]
 
 [[package]]
@@ -190,13 +191,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dhcp"
-version = "0.1.0"
-dependencies = [
- "w5500-ll",
-]
-
-[[package]]
 name = "eeprom25aa02e48"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -271,6 +265,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712a4d093c9976e24e7dbca41db895dabcbac38eb5f4045393d17a95bdfb1109"
 dependencies = [
  "scopeguard",
+]
+
+[[package]]
+name = "log"
+version = "0.4.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
+dependencies = [
+ "cfg-if",
 ]
 
 [[package]]
@@ -547,10 +550,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "w5500-hl"
-version = "0.7.0"
+name = "w5500-dhcp"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2478ba11df72e36a03783e6cc72eb3a0ea5ad065810ff37f5b298f3389eff82d"
+checksum = "c4ac8735e043f3bd42044b2ab99d4f7c44d10d1ae9a01f0426d4e3decfd990ad"
+dependencies = [
+ "log",
+ "w5500-hl",
+]
+
+[[package]]
+name = "w5500-hl"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba8c205ddf1e15bfde1c5e0d97bdbcdbde2f6d4b73614f175d8811ec1b9a6306"
 dependencies = [
  "nb 1.0.0",
  "w5500-ll",
@@ -558,9 +571,9 @@ dependencies = [
 
 [[package]]
 name = "w5500-ll"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c752ee430df69eadc93b3022db5830d43824275dfe8fa36eba35556adfe41ad"
+checksum = "973a884c8186d2e44092f4ca23f7ca1be4e7d8d99e57a60ab07a8163214d11b0"
 dependencies = [
  "embedded-hal",
 ]

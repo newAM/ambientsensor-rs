@@ -31,18 +31,7 @@ jobs:
         with:
           toolchain: stable
           target: thumbv6m-none-eabi
-      - run: cargo build --target thumbv6m-none-eabi --release --features release
-
-  test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    env: {"RUSTFLAGS": "-D warnings"}
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1.0.7
-        with:
-          toolchain: stable
-      - run: cargo test -p dhcp --target x86_64-unknown-linux-gnu
+      - run: cargo build --target thumbv6m-none-eabi --release
 
   clippy:
     name: Clippy
@@ -57,8 +46,8 @@ jobs:
       # https://github.com/actions-rs/clippy-check/issues/2
       - run: cargo clippy --all-features -- --deny warnings
 
-  format_check:
-    name: Rust Format
+  format:
+    name: Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

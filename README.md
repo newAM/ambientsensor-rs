@@ -10,7 +10,6 @@ This is still a work in progress.
 
 1. The OPT3002 luminosity sensor is not implemented.
 2. The panic handler needs to get hooked up to the EEPROM to store error logs then reset.
-3. Unit tests for DHCP/MQTT.
 
 ## Purpose
 
@@ -34,10 +33,12 @@ There is not a lot of commentary I can offer about embedded rust that has not al
 * [eeprom25aa02e48](https://github.com/newAM/eeprom25aa02e48-rs) - EEPROM driver, my first rust crate
 * [w5500-ll](https://github.com/newAM/w5500-ll-rs) - Low level W5500 Ethernet chip driver
 * [w5500-hl](https://github.com/newAM/w5500-hl-rs) - Higher level W5500 Ethernet chip driver
+* [w5500-dhcp](https://github.com/newAM/w5500-dhcp-rs) - Simple W5500 DHCP client
 * [bme280](https://github.com/newAM/bme280-rs) - Bosch BME280 driver
 * [newam-mqtt](https://github.com/newAM/newam-mqtt) - MQTT packet serialization and deserialization
 
 ## Building
+
 You will need [rustup] and the `thumbv6m-none-eabi` target.
 
 ```bash
