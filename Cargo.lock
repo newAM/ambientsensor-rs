@@ -152,9 +152,9 @@ dependencies = [
 
 [[package]]
 name = "cortex-m-rtic"
-version = "0.6.0-rc.4"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8a39a6cfe367f56464ea089489c8ce8a0d14ad0e6dd7bc3770050bb1785ce02"
+checksum = "daae9c453d0d5b467ebcdeae7aba537cb45a7de899930ad09f01c8dc42aa531f"
 dependencies = [
  "bare-metal 1.0.0",
  "cortex-m",
@@ -167,9 +167,9 @@ dependencies = [
 
 [[package]]
 name = "cortex-m-rtic-macros"
-version = "0.6.0-rc.4"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1794cde3951be8de7c9e41a4ff6c4ebeca9d1adb2a053513f64061803d6cae92"
+checksum = "7ba355d1639cf8df7c0658f01bd8952d11d49a029309118787eb54afc47a6cf8"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -211,9 +211,21 @@ dependencies = [
 
 [[package]]
 name = "fugit"
-version = "0.3.0"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e4508138d453a72fc32ff5b12f69ddcf14bac0b020445305ba623755deb9dbd"
+checksum = "22e489f95411a50db661b18e072459bbdc084de522a8530e4709bef593bf3c18"
+dependencies = [
+ "gcd",
+]
+
+[[package]]
+name = "gcd"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f37978dab2ca789938a83b2f8bc1ef32db6633af9051a6cd409eff72cbaaa79a"
+dependencies = [
+ "paste",
+]
 
 [[package]]
 name = "hash32"
@@ -232,9 +244,9 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "heapless"
-version = "0.7.8"
+version = "0.7.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c1ad878e07405df82b695089e63d278244344f80e764074d0bdfe99b89460f3"
+checksum = "7e476c64197665c3725621f0ac3f9e5209aa5e889e02a08b1daf5f16dc5fd952"
 dependencies = [
  "atomic-polyfill",
  "hash32",
@@ -303,6 +315,12 @@ version = "0.1.0"
 source = "git+https://github.com/newAM/newam-mqtt.git?rev=d34c37d6fc7bf44a6ace4e4efffa35c95c235156#d34c37d6fc7bf44a6ace4e4efffa35c95c235156"
 
 [[package]]
+name = "paste"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0744126afe1a6dd7f394cb50a716dbe086cb06e255e53d8d0185d82828358fb5"
+
+[[package]]
 name = "proc-macro-error"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -328,9 +346,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.32"
+version = "1.0.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba508cc11742c0dc5c1659771673afbab7a0efab23aa17e854cbab0837ed0b43"
+checksum = "392a54546fda6b7cc663379d0e6ce8b324cf88aecc5a499838e1be9781bdce2e"
 dependencies = [
  "unicode-xid",
 ]
@@ -384,21 +402,21 @@ dependencies = [
 
 [[package]]
 name = "rtic-core"
-version = "0.3.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bd58a6949de8ff797a346a28d9f13f7b8f54fa61bb5e3cb0985a4efb497a5ef"
+checksum = "d9369355b04d06a3780ec0f51ea2d225624db777acbc60abd8ca4832da5c1a42"
 
 [[package]]
 name = "rtic-monotonic"
-version = "0.1.0-rc.2"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e019d674efea87f510f6857e8a381cab2781b415d37d34564440d902eb6c946"
+checksum = "fb8b0b822d1a366470b9cea83a1d4e788392db763539dc4ba022bcc787fece82"
 
 [[package]]
 name = "rtic-syntax"
-version = "0.5.0-rc.2"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f60670421cd7af9cb6e0562cc093710c634ff6e2374c2d664c82aa315b3c7ea4"
+checksum = "24b149ff3177daeee442bb81ef7867d20d3c1ffea8a0a94e46e0e4b876ec4be2"
 dependencies = [
  "indexmap",
  "proc-macro2",
@@ -496,9 +514,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.81"
+version = "1.0.84"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2afee18b8beb5a596ecb4a2dce128c719b4ba399d34126b9e4396e3f9860966"
+checksum = "ecb2e6da8ee5eb9a61068762a32fa9619cc591ceb055b3687f4cd4051ec2e06b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -507,9 +525,9 @@ dependencies = [
 
 [[package]]
 name = "systick-monotonic"
-version = "0.1.0-rc.2"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39ce021e54b01d56ef72384169f815845446364826fa4f85629e14177278ace4"
+checksum = "57e71d8e4587d8f434b88b9aef901987f46164df813a3a1d6bdf3a58debf67f0"
 dependencies = [
  "cortex-m",
  "fugit",

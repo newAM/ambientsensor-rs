@@ -8,9 +8,9 @@ edition = "2021"
 cortex-m = "0.7"
 cortex-m-rt = "0.7"
 embedded-hal = "0.2"
-cortex-m-rtic = "0.6.0-rc.4"
+cortex-m-rtic = "1"
 eeprom25aa02e48 = "0.2"
-systick-monotonic = "0.1.0-rc.2"
+systick-monotonic = "1"
 atomic-polyfill = "0.1"
 log = { version = "0.4", features = ["release_max_level_warn"] }
 stm32f0xx-hal = { version = "0.18", features = ["stm32f070xb", "rt"] }
