@@ -152,24 +152,24 @@ dependencies = [
 
 [[package]]
 name = "cortex-m-rtic"
-version = "0.6.0-rc.4"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8a39a6cfe367f56464ea089489c8ce8a0d14ad0e6dd7bc3770050bb1785ce02"
+checksum = "daae9c453d0d5b467ebcdeae7aba537cb45a7de899930ad09f01c8dc42aa531f"
 dependencies = [
  "bare-metal 1.0.0",
  "cortex-m",
  "cortex-m-rtic-macros",
  "heapless",
  "rtic-core",
- "rtic-monotonic",
+ "rtic-monotonic 1.0.0",
  "version_check",
 ]
 
 [[package]]
 name = "cortex-m-rtic-macros"
-version = "0.6.0-rc.4"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1794cde3951be8de7c9e41a4ff6c4ebeca9d1adb2a053513f64061803d6cae92"
+checksum = "7ba355d1639cf8df7c0658f01bd8952d11d49a029309118787eb54afc47a6cf8"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -384,9 +384,9 @@ dependencies = [
 
 [[package]]
 name = "rtic-core"
-version = "0.3.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bd58a6949de8ff797a346a28d9f13f7b8f54fa61bb5e3cb0985a4efb497a5ef"
+checksum = "d9369355b04d06a3780ec0f51ea2d225624db777acbc60abd8ca4832da5c1a42"
 
 [[package]]
 name = "rtic-monotonic"
@@ -395,10 +395,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e019d674efea87f510f6857e8a381cab2781b415d37d34564440d902eb6c946"
 
 [[package]]
-name = "rtic-syntax"
-version = "0.5.0-rc.2"
+name = "rtic-monotonic"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f60670421cd7af9cb6e0562cc093710c634ff6e2374c2d664c82aa315b3c7ea4"
+checksum = "fb8b0b822d1a366470b9cea83a1d4e788392db763539dc4ba022bcc787fece82"
+
+[[package]]
+name = "rtic-syntax"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24b149ff3177daeee442bb81ef7867d20d3c1ffea8a0a94e46e0e4b876ec4be2"
 dependencies = [
  "indexmap",
  "proc-macro2",
@@ -513,7 +519,7 @@ checksum = "39ce021e54b01d56ef72384169f815845446364826fa4f85629e14177278ace4"
 dependencies = [
  "cortex-m",
  "fugit",
- "rtic-monotonic",
+ "rtic-monotonic 0.1.0-rc.2",
 ]
 
 [[package]]
