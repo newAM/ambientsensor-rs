@@ -46,13 +46,9 @@ rustup target add thumbv6m-none-eabi
 ```
 
 After you have that target available you can build, the default target is already set in `.cargo/config.toml`.
+
 ```bash
 cargo build
-```
-
-Release builds require an additional feature flag to disable logging:
-```bash
-cargo build --release --features release
 ```
 
 [rustup]: https://rustup.rs/
