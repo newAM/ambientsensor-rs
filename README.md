@@ -34,7 +34,7 @@ There is not a lot of commentary I can offer about embedded rust that has not al
 * [w5500-ll](https://github.com/newAM/w5500-ll-rs) - Low level W5500 Ethernet chip driver
 * [w5500-hl](https://github.com/newAM/w5500-hl-rs) - Higher level W5500 Ethernet chip driver
 * [w5500-dhcp](https://github.com/newAM/w5500-dhcp-rs) - Simple W5500 DHCP client
-* [bme280](https://github.com/newAM/bme280-rs) - Bosch BME280 driver
+* [bme280-multibus](https://github.com/newAM/bme280-multibus) - Bosch BME280 driver
 * [newam-mqtt](https://github.com/newAM/newam-mqtt) - MQTT packet serialization and deserialization
 
 ## Building

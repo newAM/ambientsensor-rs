@@ -16,7 +16,7 @@ name = "ambientsensor"
 version = "0.1.0"
 dependencies = [
  "atomic-polyfill",
- "bme280",
+ "bme280-multibus",
  "cortex-m",
  "cortex-m-rt",
  "cortex-m-rtic",
@@ -79,9 +79,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
-name = "bme280"
+name = "bme280-multibus"
 version = "0.1.0"
-source = "git+https://github.com/newAM/bme280-rs.git?rev=2669ec67608522a56a066f0bf1596a81e72933d6#2669ec67608522a56a066f0bf1596a81e72933d6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dfd204a22abda49f32bd9a362eec4b229d05495c143737905d7f2835d7c0954b"
 dependencies = [
  "embedded-hal",
 ]
@@ -346,18 +347,18 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.35"
+version = "1.0.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "392a54546fda6b7cc663379d0e6ce8b324cf88aecc5a499838e1be9781bdce2e"
+checksum = "c7342d5883fbccae1cc37a2353b09c87c9b0f3afd73f5fb9bba687a1f733b029"
 dependencies = [
  "unicode-xid",
 ]
 
 [[package]]
 name = "quote"
-version = "1.0.10"
+version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38bc8cc6a5f2e3655e0899c1b848643b2562f853f114bfec7be120678e3ace05"
+checksum = "47aa80447ce4daf1717500037052af176af5d38cc3e571d9ec1c7353fc10c87d"
 dependencies = [
  "proc-macro2",
 ]
@@ -548,9 +549,9 @@ checksum = "77439c1b53d2303b20d9459b1ade71a83c716e3f9c34f3228c00e6f185d6c002"
 
 [[package]]
 name = "version_check"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fecdca9a5291cc2b8dcf7dc02453fee791a280f3743cb0905f8822ae463b3fe"
+checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "void"

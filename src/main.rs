@@ -8,7 +8,7 @@ use log::LevelFilter;
 use mqtt::v3::{ConnackResult, Connect, ConnectCode, Publish, PublishBuilder, QoS, CONNACK_LEN};
 
 use atomic_polyfill::{AtomicU32, Ordering};
-use bme280::{Address, Bme280, Sample};
+use bme280_multibus::{Bme280, Sample};
 use core::fmt::Write;
 use core::sync::atomic::{compiler_fence, Ordering::SeqCst};
 use embedded_hal::digital::v2::OutputPin;
@@ -62,15 +62,15 @@ const PRESSURE_PUBLISH: Publish<40> = PublishBuilder::new()
     .set_topic("/home/ambient1/pressure")
     .finalize();
 
-const BME280_SETTINGS: bme280::Settings = bme280::Settings {
-    config: bme280::Config::reset()
-        .set_standby_time(bme280::Standby::Millis125)
-        .set_filter(bme280::Filter::X8),
-    ctrl_meas: bme280::CtrlMeas::reset()
-        .set_osrs_t(bme280::Oversampling::X8)
-        .set_osrs_p(bme280::Oversampling::X8)
-        .set_mode(bme280::Mode::Normal),
-    ctrl_hum: bme280::Oversampling::X8,
+const BME280_SETTINGS: bme280_multibus::Settings = bme280_multibus::Settings {
+    config: bme280_multibus::Config::reset()
+        .set_standby_time(bme280_multibus::Standby::Millis125)
+        .set_filter(bme280_multibus::Filter::X8),
+    ctrl_meas: bme280_multibus::CtrlMeas::reset()
+        .set_osrs_t(bme280_multibus::Oversampling::X8)
+        .set_osrs_p(bme280_multibus::Oversampling::X8)
+        .set_mode(bme280_multibus::Mode::Normal),
+    ctrl_hum: bme280_multibus::Oversampling::X8,
 };
 
 #[panic_handler]
@@ -174,8 +174,11 @@ mod app {
     #[local]
     struct Local {
         exti: EXTI,
-        bme280:
-            Bme280<I2c<I2C1, PB6<gpio::Alternate<AF1>>, PB7<gpio::Alternate<AF1>>>, bme280::Init>,
+        bme280: Bme280<
+            bme280_multibus::i2c::Bme280Bus<
+                I2c<I2C1, PB6<gpio::Alternate<AF1>>, PB7<gpio::Alternate<AF1>>>,
+            >,
+        >,
     }
 
     #[init]
@@ -232,7 +235,7 @@ mod app {
         let i2c = I2c::i2c1(dp.I2C1, i2c1_pins, 100.khz(), &mut rcc);
         let mut serial = Serial::usart1(dp.USART1, uart_pins, 115_200.bps(), &mut rcc);
         let mut eeprom = eeprom25aa02e48::Eeprom25aa02e48::new(spi2, eeprom_cs);
-        let mut bme280 = Bme280::new(i2c, Address::SdoGnd);
+        let mut bme280 = Bme280::from_i2c(i2c, bme280_multibus::i2c::Address::SdoGnd).unwrap();
         let mut w5500 = W5500::new(spi1, w5500_cs);
 
         writeln!(&mut serial, "Hello world!").ok();
@@ -257,8 +260,8 @@ mod app {
         w5500_dhcp::ll::reset(&mut w5500_rst, &mut CycleDelay::default()).unwrap();
 
         // sanity check temperature sensor
-        assert_eq!(bme280.chip_id().unwrap(), bme280::CHIP_ID);
-        let bme280 = bme280.init(&BME280_SETTINGS).unwrap();
+        assert_eq!(bme280.chip_id().unwrap(), bme280_multibus::CHIP_ID);
+        bme280.settings(&BME280_SETTINGS).unwrap();
 
         // enable external interrupt for pb0 (W5500 interrupt)
         syscfg.exticr1.modify(|_, w| w.exti0().pb0());
@@ -448,7 +451,7 @@ mod app {
     fn mqtt_client(cx: mqtt_client::Context) {
         log::info!("[TASK] mqtt_client");
 
-        let bme280: &mut Bme280<_, _> = cx.local.bme280;
+        let bme280: &mut Bme280<_> = cx.local.bme280;
 
         (cx.shared.w5500, cx.shared.dhcp, cx.shared.mqtt_state).lock(|w5500, dhcp, mqtt_state| {
             if !dhcp.is_bound() {
