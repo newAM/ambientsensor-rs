@@ -20,7 +20,7 @@ w5500-dhcp = { version = "0.2", features = ["embedded-hal", "log"] }
 [dependencies.mqtt]
 package = "newam-mqtt"
 git = "https://github.com/newAM/newam-mqtt.git"
-rev = "d34c37d6fc7bf44a6ace4e4efffa35c95c235156"
+rev = "bc7ef5cfd0992ee147cd150ae7257673ed36c5d6"
 
 [profile.dev]
 codegen-units = 1
