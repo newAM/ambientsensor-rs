@@ -500,7 +500,14 @@ mod app {
                     mqtt_client::spawn().unwrap();
                 }
                 MqttState::Happy => {
-                    let sample: Sample = bme280.sample().unwrap();
+                    let sample: Sample = match bme280.sample() {
+                        Ok(s) => s,
+                        Err(e) => {
+                            log::warn!("Failed to sample BME280: {:?}", e);
+                            mqtt_client::spawn_after(5.secs()).unwrap();
+                            return;
+                        }
+                    };
                     log::info!("{:#?}", sample);
 
                     {
