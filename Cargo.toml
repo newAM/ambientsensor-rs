@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 atomic-polyfill = "0.1"
-bme280-multibus = "0.1.0"
+bme280-multibus = "0.2"
 cortex-m = "0.7"
 cortex-m-rt = "0.7"
 cortex-m-rtic = "1"
@@ -15,7 +15,7 @@ embedded-hal = "0.2"
 log = { version = "0.4", features = ["release_max_level_warn"] }
 stm32f0xx-hal = { version = "0.18", features = ["stm32f070xb", "rt"] }
 systick-monotonic = "1"
-w5500-dhcp = { version = "0.1.0", features = ["embedded-hal", "log"] }
+w5500-dhcp = { version = "0.2", features = ["embedded-hal", "log"] }
 
 [dependencies.mqtt]
 package = "newam-mqtt"

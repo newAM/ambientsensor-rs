@@ -80,9 +80,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bme280-multibus"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfd204a22abda49f32bd9a362eec4b229d05495c143737905d7f2835d7c0954b"
+checksum = "9d2934eb0e6460709c797c1682eb78629ca3b0b139ec92725af0c7230af68ddd"
 dependencies = [
  "embedded-hal",
 ]
@@ -121,9 +121,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cortex-m"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ac919ef424449ec8c08d515590ce15d9262c0ca5f0da5b0c901e971a3b783b3"
+checksum = "37ff967e867ca14eba0c34ac25cd71ea98c678e741e3915d923999bb2fe7c826"
 dependencies = [
  "bare-metal 0.2.5",
  "bitfield",
@@ -570,9 +570,9 @@ dependencies = [
 
 [[package]]
 name = "w5500-dhcp"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4ac8735e043f3bd42044b2ab99d4f7c44d10d1ae9a01f0426d4e3decfd990ad"
+checksum = "1086bd1541d272e25e669efe574bda551829563cd15294ddb0a36c8c71cdebe5"
 dependencies = [
  "log",
  "w5500-hl",
