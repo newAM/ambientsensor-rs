@@ -570,8 +570,9 @@ dependencies = [
 
 [[package]]
 name = "w5500-dhcp"
-version = "0.2.0"
-source = "git+https://github.com/newAM/w5500-rs.git?rev=0b39f82283166db43b4d38c443166c0e4a300233#0b39f82283166db43b4d38c443166c0e4a300233"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c5c042dbc5fd1da5586f75e9ef42d4e15c9ef318221720517d9465eb49b9b32"
 dependencies = [
  "log",
  "w5500-hl",
@@ -579,16 +580,18 @@ dependencies = [
 
 [[package]]
 name = "w5500-hl"
-version = "0.7.1"
-source = "git+https://github.com/newAM/w5500-rs.git?rev=0b39f82283166db43b4d38c443166c0e4a300233#0b39f82283166db43b4d38c443166c0e4a300233"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "450d8d7a803015b712ffb86bdf4b3699123767f2bb1047ac2f51c042b25012a4"
 dependencies = [
  "w5500-ll",
 ]
 
 [[package]]
 name = "w5500-ll"
-version = "0.10.1"
-source = "git+https://github.com/newAM/w5500-rs.git?rev=0b39f82283166db43b4d38c443166c0e4a300233#0b39f82283166db43b4d38c443166c0e4a300233"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "595d6f1680d84df4812f6493e1c191755ae5920d0fe3d08b81e6adc2bd9d158d"
 dependencies = [
  "embedded-hal",
 ]
