@@ -317,10 +317,11 @@ mod app {
         let seed: u64 = u64::from(cortex_m::peripheral::SYST::get_current()) << 32
             | u64::from(cortex_m::peripheral::SYST::get_current());
 
-        // enable DHCP & MQTT socket interrupts
-        w5500
-            .set_simr(DHCP_SN.bitmask() | MQTT_SN.bitmask())
-            .unwrap();
+        // enable MQTT socket interrupts
+        w5500.set_simr(MQTT_SN.bitmask()).unwrap();
+
+        let dhcp = DhcpClient::new(DHCP_SN, seed, mac, HOSTNAME);
+        dhcp.setup_socket(&mut w5500).unwrap();
 
         // start the 1s ticker
         second_ticker::spawn().unwrap();
@@ -328,7 +329,7 @@ mod app {
         (
             Shared {
                 w5500,
-                dhcp: DhcpClient::new(DHCP_SN, seed, mac, HOSTNAME),
+                dhcp,
                 mqtt_state: MqttState::Init,
             },
             Local { bme280, exti },
