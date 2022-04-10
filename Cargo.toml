@@ -15,7 +15,11 @@ embedded-hal = "0.2"
 log = { version = "0.4", features = ["release_max_level_warn"] }
 stm32f0xx-hal = { version = "0.18", features = ["stm32f070xb", "rt"] }
 systick-monotonic = "1"
-w5500-dhcp = { version = "0.2", features = ["embedded-hal", "log"] }
+
+[dependencies.w5500-dhcp]
+git = "https://github.com/newAM/w5500-rs.git"
+rev = "0b39f82283166db43b4d38c443166c0e4a300233"
+features = ["embedded-hal", "log"]
 
 [dependencies.mqtt]
 package = "newam-mqtt"

@@ -28,7 +28,7 @@ use stm32f0xx_hal::{
 };
 use systick_monotonic::{ExtU64, Systick};
 use w5500_dhcp::{
-    hl::Tcp,
+    hl::{Hostname, Tcp},
     ll::{
         blocking::vdm_infallible_gpio::W5500,
         net::{Eui48Addr, Ipv4Addr, SocketAddrV4},
@@ -36,19 +36,19 @@ use w5500_dhcp::{
         LinkStatus, OperationMode, PhyCfg, Registers, Sn, SocketInterrupt, SocketInterruptMask,
         SOCKETS,
     },
-    Dhcp,
+    Client as DhcpClient,
 };
 
 static LOGGER: Logger = Logger::new(LevelFilter::Trace);
 
-const DHCP_BUF_LEN: usize = 600;
-static mut DHCP_BUF: [u8; DHCP_BUF_LEN] = [0; DHCP_BUF_LEN];
-
-const DHCP_SOCKET: Sn = Sn::Sn0;
-const MQTT_SOCKET: Sn = Sn::Sn1;
+const DHCP_SN: Sn = Sn::Sn0;
+const MQTT_SN: Sn = Sn::Sn1;
 
 const MQTT_SERVER: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(10, 0, 0, 4), 1883);
-const HOSTNAME: &str = "ambient1";
+const HOSTNAME: Hostname<'static> = match Hostname::new("ambient1") {
+    Some(hostname) => hostname,
+    None => ::core::panic!("invalid hostname"),
+};
 const TEMPERATURE_PUBLISH: Publish<40> = PublishBuilder::new()
     .set_qos(QoS::AtMostOnce)
     .set_topic("/home/ambient1/temperature")
@@ -147,8 +147,6 @@ pub fn delay_ms(ms: u32) {
     dispatchers = [I2C2, USART1, USART2],
 )]
 mod app {
-    use w5500_dhcp::Client;
-
     use super::*;
 
     // RTIC manual says not to use this in production.
@@ -167,7 +165,7 @@ mod app {
             >,
             PA4<gpio::Output<gpio::PushPull>>,
         >,
-        dhcp: Dhcp,
+        dhcp: DhcpClient<'static>,
         mqtt_state: MqttState,
     }
 
@@ -321,7 +319,7 @@ mod app {
 
         // enable DHCP & MQTT socket interrupts
         w5500
-            .set_simr(DHCP_SOCKET.bitmask() | MQTT_SOCKET.bitmask())
+            .set_simr(DHCP_SN.bitmask() | MQTT_SN.bitmask())
             .unwrap();
 
         // start the 1s ticker
@@ -330,7 +328,7 @@ mod app {
         (
             Shared {
                 w5500,
-                dhcp: Dhcp::new(DHCP_SOCKET, seed, mac, HOSTNAME),
+                dhcp: DhcpClient::new(DHCP_SN, seed, mac, HOSTNAME),
                 mqtt_state: MqttState::Init,
             },
             Local { bme280, exti },
@@ -383,9 +381,7 @@ mod app {
             if sn_ir.recv_raised() {
                 log::info!("[DHCP] INTERRUPT RECV");
                 let bound_before: bool = dhcp.is_bound();
-                let mut client = Client::new(w5500, dhcp, unsafe { &mut DHCP_BUF });
-                client.on_recv_interrupt(now()).unwrap();
-                drop(client);
+                dhcp.process(w5500, now()).unwrap();
                 if !bound_before && dhcp.is_bound() {
                     *mqtt_state = MqttState::Init;
                     if mqtt_client::spawn().is_err() {
@@ -425,8 +421,8 @@ mod app {
                     let sn_ir: SocketInterrupt = w5500.sn_ir(*sn).unwrap();
                     w5500.set_sn_ir(*sn, sn_ir).unwrap();
                     match *sn {
-                        DHCP_SOCKET => dhcp_sn::spawn(sn_ir).unwrap(),
-                        MQTT_SOCKET => mqtt_sn::spawn(sn_ir).unwrap(),
+                        DHCP_SN => dhcp_sn::spawn(sn_ir).unwrap(),
+                        MQTT_SN => mqtt_sn::spawn(sn_ir).unwrap(),
                         _ => todo!(),
                     }
                 }
@@ -442,8 +438,7 @@ mod app {
         let monotonic_secs: u32 = TIME.fetch_add(1, Ordering::Relaxed);
 
         (cx.shared.w5500, cx.shared.dhcp).lock(|w5500, dhcp| {
-            let mut client = Client::new(w5500, dhcp, unsafe { &mut DHCP_BUF });
-            client.poll(monotonic_secs).unwrap();
+            dhcp.process(w5500, monotonic_secs).unwrap();
         });
     }
 
@@ -463,22 +458,23 @@ mod app {
             match mqtt_state {
                 MqttState::Init => {
                     const SN_IMR: SocketInterruptMask = SocketInterruptMask::DEFAULT.mask_sendok();
-                    w5500.set_sn_imr(MQTT_SOCKET, SN_IMR).unwrap();
-                    w5500.tcp_connect(MQTT_SOCKET, 33650, &MQTT_SERVER).unwrap();
+                    w5500.set_sn_imr(MQTT_SN, SN_IMR).unwrap();
+                    w5500.tcp_connect(MQTT_SN, 33650, &MQTT_SERVER).unwrap();
 
                     // we will be spawned by socket interrupt
                 }
                 MqttState::ConInt => {
                     let tx_bytes: usize = w5500
-                        .tcp_write(MQTT_SOCKET, &Connect::DEFAULT.into_array())
-                        .unwrap();
+                        .tcp_write(MQTT_SN, &Connect::DEFAULT.into_array())
+                        .unwrap()
+                        .into();
                     assert_eq!(tx_bytes, Connect::LEN);
 
                     // we will be spawned by socket interrupt
                 }
                 MqttState::RecvInt => {
                     let mut buf: [u8; CONNACK_LEN] = [0; CONNACK_LEN];
-                    let rx_bytes: usize = w5500.tcp_read(MQTT_SOCKET, &mut buf).unwrap();
+                    let rx_bytes: usize = w5500.tcp_read(MQTT_SN, &mut buf).unwrap().into();
 
                     match ConnackResult::from_buf(&buf[..rx_bytes]) {
                         Ok(connack) => {
@@ -514,21 +510,21 @@ mod app {
                         let mut publish = TEMPERATURE_PUBLISH;
                         write!(&mut publish, "{:.1}", sample.temperature).unwrap();
                         let tx_bytes: usize =
-                            w5500.tcp_write(MQTT_SOCKET, publish.as_slice()).unwrap();
+                            w5500.tcp_write(MQTT_SN, publish.as_slice()).unwrap().into();
                         assert_eq!(tx_bytes, publish.as_slice().len());
                     }
                     {
                         let mut publish = PRESSURE_PUBLISH;
                         write!(&mut publish, "{}", sample.pressure as i32).unwrap();
                         let tx_bytes: usize =
-                            w5500.tcp_write(MQTT_SOCKET, publish.as_slice()).unwrap();
+                            w5500.tcp_write(MQTT_SN, publish.as_slice()).unwrap().into();
                         assert_eq!(tx_bytes, publish.as_slice().len());
                     }
                     {
                         let mut publish = HUMIDITY_PUBLISH;
                         write!(&mut publish, "{:.1}", sample.humidity).unwrap();
                         let tx_bytes: usize =
-                            w5500.tcp_write(MQTT_SOCKET, publish.as_slice()).unwrap();
+                            w5500.tcp_write(MQTT_SN, publish.as_slice()).unwrap().into();
                         assert_eq!(tx_bytes, publish.as_slice().len());
                     }
 
