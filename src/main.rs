@@ -314,6 +314,9 @@ mod app {
         let dhcp = DhcpClient::new(DHCP_SN, seed, mac, HOSTNAME);
         dhcp.setup_socket(&mut w5500).unwrap();
 
+        // start the DHCP client
+        dhcp_sn::spawn().unwrap();
+
         // start the timeout tracker
         timeout_tracker::spawn().unwrap();
 
