@@ -5,9 +5,7 @@
 mod logger;
 
 use log::LevelFilter;
-use mqtt::v3::{ConnackResult, Connect, ConnectCode, Publish, PublishBuilder, QoS, CONNACK_LEN};
 
-use atomic_polyfill::{AtomicU32, Ordering};
 use bme280_multibus::{Bme280, Sample};
 use core::fmt::Write;
 use core::sync::atomic::{compiler_fence, Ordering::SeqCst};
@@ -28,16 +26,16 @@ use stm32f0xx_hal::{
 };
 use systick_monotonic::{ExtU64, Systick};
 use w5500_dhcp::{
-    hl::{Hostname, Tcp},
+    hl::Hostname,
     ll::{
         blocking::vdm_infallible_gpio::W5500,
         net::{Eui48Addr, Ipv4Addr, SocketAddrV4},
         spi::MODE as W5500_MODE,
-        LinkStatus, OperationMode, PhyCfg, Registers, Sn, SocketInterrupt, SocketInterruptMask,
-        SOCKETS,
+        LinkStatus, OperationMode, PhyCfg, Registers, Sn,
     },
     Client as DhcpClient,
 };
+use w5500_mqtt::{Client as MqttClient, ClientId, Event as MqttEvent, SRC_PORT as MQTT_SRC_PORT};
 
 static LOGGER: Logger = Logger::new(LevelFilter::Trace);
 
@@ -45,22 +43,12 @@ const DHCP_SN: Sn = Sn::Sn0;
 const MQTT_SN: Sn = Sn::Sn1;
 
 const MQTT_SERVER: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(10, 0, 0, 4), 1883);
-const HOSTNAME: Hostname<'static> = match Hostname::new("ambient1") {
-    Some(hostname) => hostname,
-    None => ::core::panic!("invalid hostname"),
-};
-const TEMPERATURE_PUBLISH: Publish<40> = PublishBuilder::new()
-    .set_qos(QoS::AtMostOnce)
-    .set_topic("/home/ambient1/temperature")
-    .finalize();
-const HUMIDITY_PUBLISH: Publish<40> = PublishBuilder::new()
-    .set_qos(QoS::AtMostOnce)
-    .set_topic("/home/ambient1/humidity")
-    .finalize();
-const PRESSURE_PUBLISH: Publish<40> = PublishBuilder::new()
-    .set_qos(QoS::AtMostOnce)
-    .set_topic("/home/ambient1/pressure")
-    .finalize();
+const NAME: &str = "ambient1";
+const HOSTNAME: Hostname<'static> = Hostname::new_unwrapped(NAME);
+const CLIENT_ID: ClientId<'static> = ClientId::new_unwrapped(NAME);
+const TEMPERATURE_TOPIC: &str = "/home/ambient1/temperature";
+const HUMIDITY_TOPIC: &str = "/home/ambient1/humidity";
+const PRESSURE_TOPIC: &str = "/home/ambient1/pressure";
 
 const BME280_SETTINGS: bme280_multibus::Settings = bme280_multibus::Settings {
     config: bme280_multibus::Config::reset()
@@ -94,31 +82,6 @@ unsafe fn HardFault(ef: &cortex_m_rt::ExceptionFrame) -> ! {
     }
 }
 
-static TIME: AtomicU32 = AtomicU32::new(0);
-
-#[inline]
-pub fn now() -> u32 {
-    TIME.load(Ordering::Relaxed)
-}
-
-/// State handling for the MQTT client task.
-///
-/// This is internal code, and has nothing to do with the MQTT protocol.
-///
-/// The client simply publishes sensor samples to various topics.
-/// Nothing fancy here.
-#[derive(Debug)]
-pub enum MqttState {
-    /// Initial state.
-    Init,
-    /// Socket `CON` interrupt raised, TCP socket is established.
-    ConInt,
-    /// Socket `RECV` interrupt recieved, MQTT CONACK
-    RecvInt,
-    /// The MQTT server has accepted our connection and we can publish.
-    Happy,
-}
-
 const SYSCLK_HZ: u32 = 8_000_000;
 
 pub struct CycleDelay;
@@ -140,6 +103,14 @@ impl embedded_hal::blocking::delay::DelayMs<u8> for CycleDelay {
 pub fn delay_ms(ms: u32) {
     const CYCLES_PER_MILLIS: u32 = SYSCLK_HZ / 1000;
     cortex_m::asm::delay(CYCLES_PER_MILLIS.saturating_mul(ms));
+}
+
+fn monotonic_secs() -> u32 {
+    app::monotonics::now()
+        .duration_since_epoch()
+        .to_secs()
+        .try_into()
+        .unwrap()
 }
 
 #[rtic::app(
@@ -166,7 +137,9 @@ mod app {
             PA4<gpio::Output<gpio::PushPull>>,
         >,
         dhcp: DhcpClient<'static>,
-        mqtt_state: MqttState,
+        mqtt: MqttClient<'static>,
+        dhcp_spawn_at: Option<u32>,
+        mqtt_spawn_at: Option<u32>,
     }
 
     #[local]
@@ -314,23 +287,28 @@ mod app {
         };
         log::info!("Done link up\n{}", _phy_cfg);
 
+        let mut mqtt: MqttClient = MqttClient::new(MQTT_SN, MQTT_SRC_PORT, MQTT_SERVER);
+        mqtt.set_client_id(CLIENT_ID);
+
         let seed: u64 = u64::from(cortex_m::peripheral::SYST::get_current()) << 32
             | u64::from(cortex_m::peripheral::SYST::get_current());
-
-        // enable MQTT socket interrupts
-        w5500.set_simr(MQTT_SN.bitmask()).unwrap();
 
         let dhcp = DhcpClient::new(DHCP_SN, seed, mac, HOSTNAME);
         dhcp.setup_socket(&mut w5500).unwrap();
 
-        // start the 1s ticker
-        second_ticker::spawn().unwrap();
+        // start the DHCP client
+        dhcp_sn::spawn().unwrap();
+
+        // start the timeout tracker
+        timeout_tracker::spawn().unwrap();
 
         (
             Shared {
                 w5500,
                 dhcp,
-                mqtt_state: MqttState::Init,
+                mqtt,
+                dhcp_spawn_at: None,
+                mqtt_spawn_at: None,
             },
             Local { bme280, exti },
             init::Monotonics(mono),
@@ -345,193 +323,156 @@ mod app {
         }
     }
 
-    #[task(capacity = 5, shared = [mqtt_state])]
-    fn mqtt_sn(mut cx: mqtt_sn::Context, sn_ir: SocketInterrupt) {
-        cx.shared.mqtt_state.lock(|mqtt_state| {
-            if sn_ir.discon_raised() | sn_ir.timeout_raised() {
-                log::info!("[MQTT] INTERRUPT DISCON/TIMEOUT");
-                *mqtt_state = MqttState::Init;
-                if mqtt_client::spawn().is_err() {
-                    log::info!("[MQTT] already spawned");
-                }
-            } else if sn_ir.con_raised() {
-                log::info!("[MQTT] INTERRUPT CON");
-                *mqtt_state = MqttState::ConInt;
-                if mqtt_client::spawn().is_err() {
-                    log::info!("[MQTT] already spawned");
-                }
-            } else if sn_ir.recv_raised() {
-                log::info!("[MQTT] INTERRUPT RECV");
-                *mqtt_state = MqttState::RecvInt;
-                if mqtt_client::spawn().is_err() {
-                    log::info!("[MQTT] already spawned");
-                }
-            }
-        })
-    }
+    #[task(shared = [w5500, dhcp, dhcp_spawn_at])]
+    fn dhcp_sn(cx: dhcp_sn::Context) {
+        log::info!("[TASK] dhcp_sn");
 
-    #[task(capacity = 5, shared = [w5500, dhcp, mqtt_state])]
-    fn dhcp_sn(cx: dhcp_sn::Context, sn_ir: SocketInterrupt) {
-        (cx.shared.w5500, cx.shared.dhcp, cx.shared.mqtt_state).lock(|w5500, dhcp, mqtt_state| {
-            if sn_ir.con_raised() {
-                log::info!("[DHCP] INTERRUPT CON");
-            }
-            if sn_ir.discon_raised() {
-                log::info!("[DHCP] INTERRUPT DISCON");
-            }
-            if sn_ir.recv_raised() {
-                log::info!("[DHCP] INTERRUPT RECV");
+        (cx.shared.w5500, cx.shared.dhcp, cx.shared.dhcp_spawn_at).lock(
+            |w5500, dhcp, dhcp_spawn_at| {
                 let bound_before: bool = dhcp.is_bound();
-                dhcp.process(w5500, now()).unwrap();
-                if !bound_before && dhcp.is_bound() {
-                    *mqtt_state = MqttState::Init;
-                    if mqtt_client::spawn().is_err() {
-                        log::info!("[DHCP] MQTT already spawned");
-                    }
+                let now: u32 = monotonic_secs();
+                let spawn_after_secs: u32 = dhcp.process(w5500, now).unwrap();
+
+                let spawn_at: u32 = now + spawn_after_secs;
+                *dhcp_spawn_at = Some(spawn_at);
+                log::info!("[DHCP] spawning after {spawn_after_secs} seconds, at {spawn_at}");
+
+                // spawn MQTT task if bound
+                if dhcp.is_bound() && !bound_before && mqtt_sn::spawn().is_err() {
+                    log::error!("MQTT task is already spawned")
                 }
-            }
-            if sn_ir.timeout_raised() {
-                log::info!("[DHCP] INTERRUPT TIMEOUT");
-            }
-            if sn_ir.sendok_raised() {
-                log::info!("[DHCP] INTERRUPT SENDOK");
-            }
-        })
+            },
+        )
     }
 
     /// This is the W5500 interrupt.
     ///
     /// The only interrupts we should get are for the DHCP & MQTT sockets.
     #[task(binds = EXTI0_1, local = [exti], shared = [w5500])]
+    #[allow(clippy::collapsible_if)]
     fn exti0(mut cx: exti0::Context) {
         log::info!("[TASK] exti0");
 
         cx.shared.w5500.lock(|w5500| {
             let sir: u8 = w5500.sir().unwrap();
 
+            cx.local.exti.pr.write(|w| w.pr0().set_bit());
+
             // may occur when there are power supply issues
             if sir == 0 {
-                log::warn!("spurious interrupt");
-                cx.local.exti.pr.write(|w| w.pr0().set_bit());
+                log::warn!("[W5500] spurious interrupt");
                 return;
             }
 
-            for sn in SOCKETS.iter() {
-                let mask: u8 = sn.bitmask();
-                if sir & mask != 0 {
-                    let sn_ir: SocketInterrupt = w5500.sn_ir(*sn).unwrap();
-                    w5500.set_sn_ir(*sn, sn_ir).unwrap();
-                    match *sn {
-                        DHCP_SN => dhcp_sn::spawn(sn_ir).unwrap(),
-                        MQTT_SN => mqtt_sn::spawn(sn_ir).unwrap(),
-                        _ => todo!(),
-                    }
+            if sir & DHCP_SN.bitmask() != 0 {
+                if dhcp_sn::spawn().is_err() {
+                    log::error!("DHCP task already spawned")
                 }
             }
 
-            cx.local.exti.pr.write(|w| w.pr0().set_bit());
+            if sir & MQTT_SN.bitmask() != 0 {
+                if mqtt_sn::spawn().is_err() {
+                    log::error!("MQTT task already spawned")
+                }
+            }
         });
     }
 
-    #[task(shared = [w5500, dhcp])]
-    fn second_ticker(cx: second_ticker::Context) {
-        second_ticker::spawn_after(1.secs()).unwrap();
-        let monotonic_secs: u32 = TIME.fetch_add(1, Ordering::Relaxed);
+    #[task(shared = [dhcp_spawn_at, mqtt_spawn_at])]
+    fn timeout_tracker(mut cx: timeout_tracker::Context) {
+        timeout_tracker::spawn_after(1.secs()).unwrap();
 
-        (cx.shared.w5500, cx.shared.dhcp).lock(|w5500, dhcp| {
-            dhcp.process(w5500, monotonic_secs).unwrap();
+        let now: u32 = monotonic_secs();
+
+        cx.shared.dhcp_spawn_at.lock(|dhcp_spawn_at| {
+            if let Some(then) = dhcp_spawn_at {
+                if now >= *then {
+                    if dhcp_sn::spawn().is_err() {
+                        log::error!("DHCP task is already spawned")
+                    }
+                    *dhcp_spawn_at = None;
+                }
+            }
+        });
+
+        cx.shared.mqtt_spawn_at.lock(|mqtt_spawn_at| {
+            if let Some(then) = mqtt_spawn_at {
+                if now >= *then {
+                    if mqtt_sn::spawn().is_err() {
+                        log::error!("MQTT task is already spawned")
+                    }
+                    *mqtt_spawn_at = None;
+                }
+            }
         });
     }
 
-    #[task(shared = [w5500, dhcp, mqtt_state], local = [bme280])]
-    fn mqtt_client(cx: mqtt_client::Context) {
-        log::info!("[TASK] mqtt_client");
+    #[task(shared = [w5500, mqtt, mqtt_spawn_at], local = [bme280])]
+    fn mqtt_sn(cx: mqtt_sn::Context) {
+        log::info!("[TASK] mqtt_sn");
 
         let bme280: &mut Bme280<_> = cx.local.bme280;
 
-        (cx.shared.w5500, cx.shared.dhcp, cx.shared.mqtt_state).lock(|w5500, dhcp, mqtt_state| {
-            if !dhcp.is_bound() {
-                // we will be spawned when the DHCP client binds
-                return;
-            }
-
-            log::info!("[MQTT] {:?}", mqtt_state);
-            match mqtt_state {
-                MqttState::Init => {
-                    const SN_IMR: SocketInterruptMask = SocketInterruptMask::DEFAULT.mask_sendok();
-                    w5500.set_sn_imr(MQTT_SN, SN_IMR).unwrap();
-                    w5500.tcp_connect(MQTT_SN, 33650, &MQTT_SERVER).unwrap();
-
-                    // we will be spawned by socket interrupt
-                }
-                MqttState::ConInt => {
-                    let tx_bytes: usize = w5500
-                        .tcp_write(MQTT_SN, &Connect::DEFAULT.into_array())
-                        .unwrap()
-                        .into();
-                    assert_eq!(tx_bytes, Connect::LEN);
-
-                    // we will be spawned by socket interrupt
-                }
-                MqttState::RecvInt => {
-                    let mut buf: [u8; CONNACK_LEN] = [0; CONNACK_LEN];
-                    let rx_bytes: usize = w5500.tcp_read(MQTT_SN, &mut buf).unwrap().into();
-
-                    match ConnackResult::from_buf(&buf[..rx_bytes]) {
-                        Ok(connack) => {
-                            let code: ConnectCode = connack.code();
-                            log::info!("[MQTT] CONNACK: {:?}", code);
-
-                            if code == ConnectCode::Accept {
-                                *mqtt_state = MqttState::Happy;
-                            } else {
-                                *mqtt_state = MqttState::Init;
+        (cx.shared.w5500, cx.shared.mqtt, cx.shared.mqtt_spawn_at).lock(
+            |w5500, mqtt, mqtt_spawn_at| {
+                loop {
+                    let now: u32 = monotonic_secs();
+                    match mqtt.process(w5500, now) {
+                        Ok(MqttEvent::CallAfter(secs)) => {
+                            *mqtt_spawn_at = Some(now + secs);
+                            break;
+                        }
+                        Ok(MqttEvent::ConnAck) => {
+                            log::info!("[MQTT] ConnAck");
+                            // can subscribe to topics here
+                            // not needed for this
+                        }
+                        Ok(MqttEvent::Publish(reader)) => {
+                            log::warn!("should not get Publish never subscribed");
+                            reader.done().unwrap();
+                        }
+                        Ok(MqttEvent::SubAck { pkt_id: _, code }) => {
+                            log::warn!("should not get SubAck {:?}, never subscribed", code);
+                        }
+                        Ok(MqttEvent::None) => {
+                            let sample: Sample = match bme280.sample() {
+                                Ok(s) => s,
+                                Err(e) => {
+                                    log::warn!("Failed to sample BME280: {:?}", e);
+                                    *mqtt_spawn_at = Some(now + 5);
+                                    return;
+                                }
+                            };
+                            log::info!("{:#?}", sample);
+                            {
+                                let mut data: heapless::String<16> = heapless::String::new();
+                                write!(&mut data, "{:.1}", sample.temperature).unwrap();
+                                mqtt.publish(w5500, TEMPERATURE_TOPIC, data.as_bytes())
+                                    .unwrap();
                             }
+                            {
+                                let mut data: heapless::String<16> = heapless::String::new();
+                                write!(&mut data, "{:.0}", sample.pressure).unwrap();
+                                mqtt.publish(w5500, PRESSURE_TOPIC, data.as_bytes())
+                                    .unwrap();
+                            }
+                            {
+                                let mut data: heapless::String<16> = heapless::String::new();
+                                write!(&mut data, "{:.1}", sample.humidity).unwrap();
+                                mqtt.publish(w5500, HUMIDITY_TOPIC, data.as_bytes())
+                                    .unwrap();
+                            }
+                            *mqtt_spawn_at = Some(now + 5);
+                            break;
                         }
-                        Err(_e) => {
-                            log::info!("[MQTT] {:?}", _e);
-                            *mqtt_state = MqttState::Init;
-                        }
-                    }
-
-                    mqtt_client::spawn().unwrap();
-                }
-                MqttState::Happy => {
-                    let sample: Sample = match bme280.sample() {
-                        Ok(s) => s,
                         Err(e) => {
-                            log::warn!("Failed to sample BME280: {:?}", e);
-                            mqtt_client::spawn_after(5.secs()).unwrap();
-                            return;
+                            log::error!("[MQTT] {e:?}");
+                            *mqtt_spawn_at = Some(now + 10);
+                            break;
                         }
-                    };
-                    log::info!("{:#?}", sample);
-
-                    {
-                        let mut publish = TEMPERATURE_PUBLISH;
-                        write!(&mut publish, "{:.1}", sample.temperature).unwrap();
-                        let tx_bytes: usize =
-                            w5500.tcp_write(MQTT_SN, publish.as_slice()).unwrap().into();
-                        assert_eq!(tx_bytes, publish.as_slice().len());
                     }
-                    {
-                        let mut publish = PRESSURE_PUBLISH;
-                        write!(&mut publish, "{}", sample.pressure as i32).unwrap();
-                        let tx_bytes: usize =
-                            w5500.tcp_write(MQTT_SN, publish.as_slice()).unwrap().into();
-                        assert_eq!(tx_bytes, publish.as_slice().len());
-                    }
-                    {
-                        let mut publish = HUMIDITY_PUBLISH;
-                        write!(&mut publish, "{:.1}", sample.humidity).unwrap();
-                        let tx_bytes: usize =
-                            w5500.tcp_write(MQTT_SN, publish.as_slice()).unwrap().into();
-                        assert_eq!(tx_bytes, publish.as_slice().len());
-                    }
-
-                    mqtt_client::spawn_after(5.secs()).unwrap();
                 }
-            }
-        });
+            },
+        );
     }
 }

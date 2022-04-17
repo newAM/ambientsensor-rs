@@ -37,14 +37,7 @@ impl log::Log for Logger {
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let mut inner = Inner;
-            writeln!(
-                &mut inner,
-                "[{}] [{}] {}",
-                super::now(),
-                record.level(),
-                record.args()
-            )
-            .ok();
+            writeln!(&mut inner, "[{}] {}", record.level(), record.args()).ok();
         }
     }
 
