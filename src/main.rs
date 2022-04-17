@@ -82,24 +82,6 @@ unsafe fn HardFault(ef: &cortex_m_rt::ExceptionFrame) -> ! {
     }
 }
 
-/// State handling for the MQTT client task.
-///
-/// This is internal code, and has nothing to do with the MQTT protocol.
-///
-/// The client simply publishes sensor samples to various topics.
-/// Nothing fancy here.
-#[derive(Debug)]
-pub enum MqttState {
-    /// Initial state.
-    Init,
-    /// Socket `CON` interrupt raised, TCP socket is established.
-    ConInt,
-    /// Socket `RECV` interrupt recieved, MQTT CONACK
-    RecvInt,
-    /// The MQTT server has accepted our connection and we can publish.
-    Happy,
-}
-
 const SYSCLK_HZ: u32 = 8_000_000;
 
 pub struct CycleDelay;
