@@ -15,18 +15,18 @@ dependencies = [
 name = "ambientsensor"
 version = "0.1.0"
 dependencies = [
- "atomic-polyfill",
  "bme280-multibus",
  "cortex-m",
  "cortex-m-rt",
  "cortex-m-rtic",
  "eeprom25aa02e48",
  "embedded-hal",
+ "heapless",
  "log",
- "newam-mqtt",
  "stm32f0xx-hal",
  "systick-monotonic",
  "w5500-dhcp",
+ "w5500-mqtt",
 ]
 
 [[package]]
@@ -311,11 +311,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
 
 [[package]]
-name = "newam-mqtt"
-version = "0.1.0"
-source = "git+https://github.com/newAM/newam-mqtt.git?rev=bc7ef5cfd0992ee147cd150ae7257673ed36c5d6#bc7ef5cfd0992ee147cd150ae7257673ed36c5d6"
-
-[[package]]
 name = "paste"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -571,8 +566,7 @@ dependencies = [
 [[package]]
 name = "w5500-dhcp"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c5c042dbc5fd1da5586f75e9ef42d4e15c9ef318221720517d9465eb49b9b32"
+source = "git+https://github.com/newAM/w5500-rs?rev=1a70a47608241de4f853eac3bbbe0a8f53c86ef1#1a70a47608241de4f853eac3bbbe0a8f53c86ef1"
 dependencies = [
  "log",
  "w5500-hl",
@@ -581,8 +575,7 @@ dependencies = [
 [[package]]
 name = "w5500-hl"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "450d8d7a803015b712ffb86bdf4b3699123767f2bb1047ac2f51c042b25012a4"
+source = "git+https://github.com/newAM/w5500-rs?rev=1a70a47608241de4f853eac3bbbe0a8f53c86ef1#1a70a47608241de4f853eac3bbbe0a8f53c86ef1"
 dependencies = [
  "w5500-ll",
 ]
@@ -590,8 +583,16 @@ dependencies = [
 [[package]]
 name = "w5500-ll"
 version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "595d6f1680d84df4812f6493e1c191755ae5920d0fe3d08b81e6adc2bd9d158d"
+source = "git+https://github.com/newAM/w5500-rs?rev=1a70a47608241de4f853eac3bbbe0a8f53c86ef1#1a70a47608241de4f853eac3bbbe0a8f53c86ef1"
 dependencies = [
  "embedded-hal",
+]
+
+[[package]]
+name = "w5500-mqtt"
+version = "0.1.0"
+source = "git+https://github.com/newAM/w5500-rs?rev=1a70a47608241de4f853eac3bbbe0a8f53c86ef1#1a70a47608241de4f853eac3bbbe0a8f53c86ef1"
+dependencies = [
+ "log",
+ "w5500-hl",
 ]
