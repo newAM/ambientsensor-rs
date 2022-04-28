@@ -18,12 +18,12 @@ systick-monotonic = "1"
 
 [dependencies.w5500-dhcp]
 git = "https://github.com/newAM/w5500-rs"
-rev = "1a70a47608241de4f853eac3bbbe0a8f53c86ef1"
+rev = "16ff6b6e1013d1d31e42b23657b31ee98b2b9548"
 features = ["embedded-hal", "log"]
 
 [dependencies.w5500-mqtt]
 git = "https://github.com/newAM/w5500-rs"
-rev = "1a70a47608241de4f853eac3bbbe0a8f53c86ef1"
+rev = "16ff6b6e1013d1d31e42b23657b31ee98b2b9548"
 features = ["embedded-hal", "log"]
 
 [profile.dev]

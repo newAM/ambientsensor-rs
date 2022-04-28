@@ -329,7 +329,7 @@ mod app {
 
         (cx.shared.w5500, cx.shared.dhcp, cx.shared.dhcp_spawn_at).lock(
             |w5500, dhcp, dhcp_spawn_at| {
-                let bound_before: bool = dhcp.is_bound();
+                let leased_before: bool = dhcp.has_lease();
                 let now: u32 = monotonic_secs();
                 let spawn_after_secs: u32 = dhcp.process(w5500, now).unwrap();
 
@@ -338,7 +338,7 @@ mod app {
                 log::info!("[DHCP] spawning after {spawn_after_secs} seconds, at {spawn_at}");
 
                 // spawn MQTT task if bound
-                if dhcp.is_bound() && !bound_before && mqtt_sn::spawn().is_err() {
+                if dhcp.has_lease() && !leased_before && mqtt_sn::spawn().is_err() {
                     log::error!("MQTT task is already spawned")
                 }
             },
@@ -431,14 +431,14 @@ mod app {
                             log::warn!("should not get Publish never subscribed");
                             reader.done().unwrap();
                         }
-                        Ok(MqttEvent::SubAck { pkt_id: _, code }) => {
-                            log::warn!("should not get SubAck {:?}, never subscribed", code);
+                        Ok(MqttEvent::SubAck { .. } | MqttEvent::UnsubAck { .. }) => {
+                            log::warn!("should not get (Un)SubAck, never (un)subscribed");
                         }
                         Ok(MqttEvent::None) => {
                             let sample: Sample = match bme280.sample() {
                                 Ok(s) => s,
                                 Err(e) => {
-                                    log::warn!("Failed to sample BME280: {:?}", e);
+                                    log::warn!("Failed to sample BME280: {e:?}");
                                     *mqtt_spawn_at = Some(now + 5);
                                     return;
                                 }
