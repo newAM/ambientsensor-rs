@@ -431,7 +431,7 @@ mod app {
                             log::warn!("should not get Publish never subscribed");
                             reader.done().unwrap();
                         }
-                        Ok(MqttEvent::SubAck { .. } | MqttEvent::UnsubAck { .. }) => {
+                        Ok(MqttEvent::SubAck(_) | MqttEvent::UnSubAck(_)) => {
                             log::warn!("should not get (Un)SubAck, never (un)subscribed");
                         }
                         Ok(MqttEvent::None) => {
