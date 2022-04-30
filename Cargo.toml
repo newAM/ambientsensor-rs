@@ -18,12 +18,12 @@ systick-monotonic = "1"
 
 [dependencies.w5500-dhcp]
 git = "https://github.com/newAM/w5500-rs"
-rev = "16ff6b6e1013d1d31e42b23657b31ee98b2b9548"
+rev = "be7fca50f7161759ad154101c3dfc05ca1b76109"
 features = ["embedded-hal", "log"]
 
 [dependencies.w5500-mqtt]
 git = "https://github.com/newAM/w5500-rs"
-rev = "16ff6b6e1013d1d31e42b23657b31ee98b2b9548"
+rev = "be7fca50f7161759ad154101c3dfc05ca1b76109"
 features = ["embedded-hal", "log"]
 
 [profile.dev]
@@ -32,7 +32,7 @@ debug = 2
 debug-assertions = true
 incremental = true
 lto = false
-opt-level = 3
+opt-level = "s"
 overflow-checks = true
 
 [profile.test]
@@ -41,7 +41,7 @@ debug = 2
 debug-assertions = true
 incremental = true
 lto = false
-opt-level = 3
+opt-level = "s"
 overflow-checks = true
 
 [profile.bench]
@@ -50,7 +50,7 @@ debug = 2
 debug-assertions = false
 incremental = false
 lto = false
-opt-level = 3
+opt-level = "s"
 overflow-checks = true
 
 [profile.release]
@@ -59,5 +59,5 @@ debug = 2
 debug-assertions = false
 incremental = false
 lto = false
-opt-level = 3
+opt-level = "s"
 overflow-checks = true
