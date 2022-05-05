@@ -15,16 +15,8 @@ heapless = "0.7"
 log = { version = "0.4", features = ["release_max_level_warn"] }
 stm32f0xx-hal = { version = "0.18", features = ["stm32f070xb", "rt"] }
 systick-monotonic = "1"
-
-[dependencies.w5500-dhcp]
-git = "https://github.com/newAM/w5500-rs"
-rev = "be7fca50f7161759ad154101c3dfc05ca1b76109"
-features = ["embedded-hal", "log"]
-
-[dependencies.w5500-mqtt]
-git = "https://github.com/newAM/w5500-rs"
-rev = "be7fca50f7161759ad154101c3dfc05ca1b76109"
-features = ["embedded-hal", "log"]
+w5500-dhcp = { version = "0.4", features = ["embedded-hal", "log"] }
+w5500-mqtt = { version = "0.1", features = ["embedded-hal", "log"] }
 
 [profile.dev]
 codegen-units = 1
