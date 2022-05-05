@@ -301,9 +301,9 @@ dependencies = [
 
 [[package]]
 name = "ff"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2958d04124b9f27f175eaeb9a9f383d026098aa837eadd8ba22c11f13a05b9e"
+checksum = "131655483be284720a17d74ff97592b8e76576dc25563148601df2d7c9080924"
 dependencies = [
  "rand_core",
  "subtle",
@@ -427,9 +427,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.16"
+version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6389c490849ff5bc16be905ae24bc913a9c8892e19b2341dbc175e14c341c2b8"
+checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
  "cfg-if",
 ]
@@ -596,7 +596,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
 dependencies = [
- "semver 1.0.7",
+ "semver 1.0.9",
 ]
 
 [[package]]
@@ -628,9 +628,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.7"
+version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d65bd28f48be7196d222d95b9243287f48d27aca604e08497513019ff0502cc4"
+checksum = "8cb243bdfdb5936c8dc3c45762a19d12ab4550cdc753bc247637d4ec35a040fd"
 
 [[package]]
 name = "semver-parser"
@@ -728,9 +728,9 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 
 [[package]]
 name = "unicode-xid"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
+checksum = "957e51f3646910546462e67d5f7599b9e4fb8acdd304b087a6494730f9eebf04"
 
 [[package]]
 name = "vcell"
@@ -761,8 +761,9 @@ dependencies = [
 
 [[package]]
 name = "w5500-dhcp"
-version = "0.3.0"
-source = "git+https://github.com/newAM/w5500-rs?rev=be7fca50f7161759ad154101c3dfc05ca1b76109#be7fca50f7161759ad154101c3dfc05ca1b76109"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b76dd8bae2de7ca2ff34281312d6cc50e70dd9a7056176d00920e5128824e651"
 dependencies = [
  "log",
  "w5500-hl",
@@ -770,8 +771,9 @@ dependencies = [
 
 [[package]]
 name = "w5500-hl"
-version = "0.8.0"
-source = "git+https://github.com/newAM/w5500-rs?rev=be7fca50f7161759ad154101c3dfc05ca1b76109#be7fca50f7161759ad154101c3dfc05ca1b76109"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c50be5e614c481c23b78b6e986e3e9a0c3a316ab11368a9ad42150ffeead9ff6"
 dependencies = [
  "w5500-ll",
 ]
@@ -779,7 +781,8 @@ dependencies = [
 [[package]]
 name = "w5500-ll"
 version = "0.10.3"
-source = "git+https://github.com/newAM/w5500-rs?rev=be7fca50f7161759ad154101c3dfc05ca1b76109#be7fca50f7161759ad154101c3dfc05ca1b76109"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "305c0ec2e7f50e0da8089e050ef2ee0cc55a09f81f36720d2f84322bc1e8ccb2"
 dependencies = [
  "embedded-hal",
 ]
@@ -787,7 +790,8 @@ dependencies = [
 [[package]]
 name = "w5500-mqtt"
 version = "0.1.0"
-source = "git+https://github.com/newAM/w5500-rs?rev=be7fca50f7161759ad154101c3dfc05ca1b76109#be7fca50f7161759ad154101c3dfc05ca1b76109"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a253545cb0ac9011ac496a52100bea971f663c67529bb7190b51ee749040e3f2"
 dependencies = [
  "log",
  "w5500-hl",
@@ -796,8 +800,9 @@ dependencies = [
 
 [[package]]
 name = "w5500-tls"
-version = "0.1.0"
-source = "git+https://github.com/newAM/w5500-rs?rev=be7fca50f7161759ad154101c3dfc05ca1b76109#be7fca50f7161759ad154101c3dfc05ca1b76109"
+version = "0.1.0-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc1b729f8b78c5bf0a2716ef1b6cb35832445fb90f81697ca977a38882916aa7"
 dependencies = [
  "heapless",
  "hkdf",
@@ -812,6 +817,6 @@ dependencies = [
 
 [[package]]
 name = "zeroize"
-version = "1.5.4"
+version = "1.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7eb5728b8afd3f280a869ce1d4c554ffaed35f45c231fc41bfbd0381bef50317"
+checksum = "94693807d016b2f2d2e14420eb3bfcca689311ff775dcf113d74ea624b7cdf07"
