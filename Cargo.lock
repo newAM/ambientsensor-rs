@@ -792,9 +792,9 @@ dependencies = [
 
 [[package]]
 name = "w5500-mqtt"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12b4b35686a463903dffda4b3839def22296dd0e0cf6b84308e43d8a2dc84aa8"
+checksum = "daf14397157b1a9df9906e68ef605c67c8f9d5b3d368e82415ce13c69b803633"
 dependencies = [
  "log",
  "w5500-hl",
@@ -803,10 +803,11 @@ dependencies = [
 
 [[package]]
 name = "w5500-tls"
-version = "0.1.0"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a712ec9d73e21cd3f883ee35232ad3c8293108ee1266e7f328219cd6b31b129"
+checksum = "982aefc585223e1caa145e769d65d749f94b4cb2fb987de2e4b57385b6fb84c6"
 dependencies = [
+ "cfg-if",
  "heapless",
  "hkdf",
  "hmac",
