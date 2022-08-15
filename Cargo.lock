@@ -94,9 +94,9 @@ dependencies = [
 
 [[package]]
 name = "bme280-multibus"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "573450a6afe92ac4ad4dff3aa61ad6fd34d75e56a81b32468021bb4c836d4b32"
+checksum = "cca18ff16faa313cb4bf19ded9ad44563b223b90fe1935adafecab81684929aa"
 dependencies = [
  "embedded-hal",
 ]
