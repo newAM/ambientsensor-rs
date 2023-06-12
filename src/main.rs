@@ -160,7 +160,7 @@ mod app {
         let cs = unsafe { &cortex_m::interrupt::CriticalSection::new() };
 
         unsafe { log::set_logger_racy(&LOGGER).unwrap() };
-        log::set_max_level(LevelFilter::Trace);
+        unsafe { log::set_max_level_racy(LevelFilter::Trace) };
 
         let mut dp = cx.device;
         let mut rcc = {
