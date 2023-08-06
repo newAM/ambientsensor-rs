@@ -51,10 +51,10 @@ const HUMIDITY_TOPIC: &str = "/home/ambient1/humidity";
 const PRESSURE_TOPIC: &str = "/home/ambient1/pressure";
 
 const BME280_SETTINGS: bme280_multibus::Settings = bme280_multibus::Settings {
-    config: bme280_multibus::Config::reset()
+    config: bme280_multibus::Config::RESET
         .set_standby_time(bme280_multibus::Standby::Millis125)
         .set_filter(bme280_multibus::Filter::X8),
-    ctrl_meas: bme280_multibus::CtrlMeas::reset()
+    ctrl_meas: bme280_multibus::CtrlMeas::RESET
         .set_osrs_t(bme280_multibus::Oversampling::X8)
         .set_osrs_p(bme280_multibus::Oversampling::X8)
         .set_mode(bme280_multibus::Mode::Normal),
@@ -146,7 +146,7 @@ mod app {
     struct Local {
         exti: EXTI,
         bme280: Bme280<
-            bme280_multibus::i2c::Bme280Bus<
+            bme280_multibus::i2c0::Bme280Bus<
                 I2c<I2C1, PB6<gpio::Alternate<AF1>>, PB7<gpio::Alternate<AF1>>>,
             >,
         >,
@@ -206,7 +206,7 @@ mod app {
         let i2c = I2c::i2c1(dp.I2C1, i2c1_pins, 100.khz(), &mut rcc);
         let mut serial = Serial::usart1(dp.USART1, uart_pins, 115_200.bps(), &mut rcc);
         let mut eeprom = eeprom25aa02e48::Eeprom25aa02e48::new(spi2, eeprom_cs);
-        let mut bme280 = Bme280::from_i2c(i2c, bme280_multibus::i2c::Address::SdoGnd).unwrap();
+        let mut bme280 = Bme280::from_i2c0(i2c, bme280_multibus::i2c0::Address::SdoGnd).unwrap();
         let mut w5500 = W5500::new(spi1, w5500_cs);
 
         writeln!(&mut serial, "Hello world!").ok();

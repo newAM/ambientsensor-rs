@@ -5,7 +5,7 @@ authors = ["Alex Martens <alex@thinglab.org>"]
 edition = "2021"
 
 [dependencies]
-bme280-multibus = "0.2"
+bme280-multibus = "0.3"
 cortex-m = "0.7"
 cortex-m-rt = "0.7"
 cortex-m-rtic = "1"
