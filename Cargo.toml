@@ -15,8 +15,8 @@ heapless = "0.7"
 log = { version = "0.4.19", features = ["release_max_level_warn"] }
 stm32f0xx-hal = { version = "0.18", features = ["stm32f070xb", "rt"] }
 systick-monotonic = "1"
-w5500-dhcp = { version = "0.4", features = ["embedded-hal", "log"] }
-w5500-mqtt = { version = "0.1", features = ["embedded-hal", "log"] }
+w5500-dhcp = { version = "0.5", features = ["eh0", "log"] }
+w5500-mqtt = { version = "0.2", features = ["eh0", "log"] }
 
 [profile.dev]
 codegen-units = 1

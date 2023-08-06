@@ -28,9 +28,9 @@ use systick_monotonic::{ExtU64, Systick};
 use w5500_dhcp::{
     hl::Hostname,
     ll::{
-        blocking::vdm_infallible_gpio::W5500,
+        eh0::vdm_infallible_gpio::W5500,
+        eh0::MODE as W5500_MODE,
         net::{Eui48Addr, Ipv4Addr, SocketAddrV4},
-        spi::MODE as W5500_MODE,
         LinkStatus, OperationMode, PhyCfg, Registers, Sn,
     },
     Client as DhcpClient,
@@ -228,7 +228,7 @@ mod app {
         debug_assert_eq!(mac.octets[0], 0x54);
         log::info!("MAC: {}", mac);
 
-        w5500_dhcp::ll::reset(&mut w5500_rst, &mut CycleDelay).unwrap();
+        w5500_dhcp::ll::eh0::reset(&mut w5500_rst, &mut CycleDelay).unwrap();
 
         // sanity check temperature sensor
         assert_eq!(bme280.chip_id().unwrap(), bme280_multibus::CHIP_ID);
