@@ -228,7 +228,7 @@ mod app {
         debug_assert_eq!(mac.octets[0], 0x54);
         log::info!("MAC: {}", mac);
 
-        w5500_dhcp::ll::reset(&mut w5500_rst, &mut CycleDelay::default()).unwrap();
+        w5500_dhcp::ll::reset(&mut w5500_rst, &mut CycleDelay).unwrap();
 
         // sanity check temperature sensor
         assert_eq!(bme280.chip_id().unwrap(), bme280_multibus::CHIP_ID);
