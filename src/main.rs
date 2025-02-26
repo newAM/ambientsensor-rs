@@ -290,7 +290,7 @@ mod app {
         let mut mqtt: MqttClient = MqttClient::new(MQTT_SN, MQTT_SRC_PORT, MQTT_SERVER);
         mqtt.set_client_id(CLIENT_ID);
 
-        let seed: u64 = u64::from(cortex_m::peripheral::SYST::get_current()) << 32
+        let seed: u64 = (u64::from(cortex_m::peripheral::SYST::get_current()) << 32)
             | u64::from(cortex_m::peripheral::SYST::get_current());
 
         let dhcp = DhcpClient::new(DHCP_SN, seed, mac, HOSTNAME);
