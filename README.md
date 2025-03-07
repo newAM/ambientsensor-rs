@@ -23,7 +23,7 @@ There is not a lot of commentary I can offer about embedded rust that has not al
 
 ## Notable crates used
 
-* [rtic](https://rtic.rs/0.5/book/en/) - RTOS
+* [rtic](https://rtic.rs/) - RTOS
 * [rtt_target](https://docs.rs/rtt-target/0.3.0/rtt_target/) - Probe based logging 
 * [cargo-embed](https://crates.io/crates/cargo-embed) - build and run your code with one command
 * [embedded-hal](https://github.com/rust-embedded/embedded-hal) - abstractions for embedded hardware
